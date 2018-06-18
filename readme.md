@@ -60,3 +60,36 @@ static uv_once_t init_once = UV_ONCE_INIT;
 ```
 
 ### Lecture 5 - The basics of threads
+
+* the event loop is used by node to handle async code in apps
+* process is an instace of a running program
+* a process can have multiple threads
+* a thread is a part of code that executes on CPU. multiple threads can run in parallel
+* scheduling is used by the OS to decide which thread to run at any given moment
+* the num of concurent threads is dependent on cpu cores and cpu capabilities (instructions/cycle)
+* there are different reqs in terms of latency in threads
+* to reduce thread latency we can 
+	* add cpu cores
+	* set OS to detect pauses in our program (eg during IO r/w) to pass execution to other threads
+
+### Lecture 6 - The Node Event Loop
+
+* a node program upon start creates a single thread. 
+* in this thread resides an event loop
+* the event loop provides control over what will execute at any given time
+* it runs after our code file is executed in iterations - loops or ticks
+
+### Lecture 7 - The event loop implementation
+
+* to decide if the event loop will continue node does 3 checks before each iteration
+	* Check one: any pending SetTimeout, SetInterval, setImmediate?
+	* Check two: any pending OS tasks? (e.g server listening to port)
+	* Check three: any pending long running operations?  (e.g ffs module)
+* node keeps a list of all tasks being executed in arrays
+* arrays are initialized before file execution
+* arrays are populated during soulrce file exection depending on the application code
+* the arrays are not actual JS arrays
+
+### Lecture 8 - Event Loop Ticks
+
+* 

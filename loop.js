@@ -26,7 +26,13 @@ function shouldContinue() {
 while(shouldContinue) {
 	// single run = tick
 	// 1) Node looks at pendingTimers and sees if any functions are ready to be called
-	//
+	// 2) Node looks at pendingOSTasks and pendingOperations and calls relevant callbacks
+	// 3) Node pauses execution (momentarily). Continue when...
+	//	- 	a new pendingOStask is done
+	// 	- 	a new pendingOperation is done
+	//	-	a timer is about to complete
+	// 4) Look at pendingTimers (call any setImmediate)
+	// 5) Handle any 'close' events
 }
 
 ///////////////////////////

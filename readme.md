@@ -92,4 +92,18 @@ static uv_once_t init_once = UV_ONCE_INIT;
 
 ### Lecture 8 - Event Loop Ticks
 
+* event loop in every tick does the following
+* 1) Node looks at pendingTimers and sees if any functions are ready to be called (setTimeout, setInterval)
+* 2) Node looks at pendingOSTasks and pendingOperations and calls relevant callbacks
+* 3) Node pauses execution (momentarily). Continue when...
+*	- 	a new pendingOStask is done
+* 	- 	a new pendingOperation is done
+*	-	a timer is about to complete
+* if there was no wait the loop would run as fas as it could
+* 4) Look at pendingTimers (call any setImmediate)
+* 5) Handle any 'close' events
+* an example of a close event is a `readStream.on('close', () => { console.log('cleanup')});`
+
+### Lecture 9 - Is Node single Threaded?
+
 * 

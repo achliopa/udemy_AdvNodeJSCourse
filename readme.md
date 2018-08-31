@@ -21,7 +21,7 @@
 	* See how V8 and libuv are used to implement that function
 * we chose pbkdf2 function from crypto lib. it takes a password a salt and other options and returns a hash
 * we visit [NodeJS github repo](https://github.com/nodejs/node)
-* lib folder contains builtin libraries (JS code)
+* lib folder contains builtin libraries (JS code) we use in our projects
 * src folder contains C++ implementation. this is where node.js calls V8 engine and libuv
 * pbkdf2 JS implementation is in /lib/internal/crypto/pbkdf2.js
 * in its JS function declaration it calls _pbkdf2 (JS in same file in lib) which in turn calls PBKDF2 with same args . this is the actual function that does the hashing. it is implemented in C++ and resides in src
@@ -38,6 +38,7 @@ const { INT_MAX, pbkdf2: _pbkdf2 } = process.binding('crypto');
 ```
 env->SetMethod(target, "pbkdf2", PBKDF2);
 ```
+* it exports cpp method PBKDF2 as pbkdf2 for the binding
 * the actual implementation resides inthe same file
 ```
 inline void PBKDF2(const FunctionCallbackInfo<Value>& args) {
@@ -52,12 +53,14 @@ using v8::Array;
 using v8::Boolean;
 using v8::Context;
 ```
+* the purpose of V8 in this souce code is to act as an intermediate ans allow values from JS to be translated to their C++ equivalents
 * these are C++ implementation of JS concepts
-* libuv is also used as uv_
+* libuv is also used as uv_ in c++ source file
 ```
 static uv_once_t init_once = UV_ONCE_INIT;
   uv_once(&init_once, InitCryptoOnce);
 ```
+* it is uses for concurrency ans processing constructs on C++ side
 
 ### Lecture 5 - The basics of threads
 
@@ -71,13 +74,22 @@ static uv_once_t init_once = UV_ONCE_INIT;
 * to reduce thread latency we can 
 	* add cpu cores
 	* set OS to detect pauses in our program (eg during IO r/w) to pass execution to other threads
+* scheduling is done by the OS
 
 ### Lecture 6 - The Node Event Loop
 
-* a node program upon start creates a single thread. 
-* in this thread resides an event loop
-* the event loop provides control over what will execute at any given time
-* it runs after our code file is executed in iterations - loops or ticks
+* a node program upon start creates a single thread to execute all our code. 
+* in this thread resides an event loop which is a control structure
+* the event loop provides control over what will execute at any given time (what the signle thread will do at any time)
+* each node program we run has 1 event loop
+* node program performance is dependent on event loop behaviour
+* we ll write some code to see how event loop works. it will emulate the event loop
+* we make a new file *loop.js*. the comment in it is fake
+	* we emulate the program behaviour: run with 'node loop.js', exit when we are done
+	* when we run a node program event loop does not start immediatly
+	* first thing done is node executing the js code
+	* after contents of the file get executed it enters the event loop (like a while loop)
+	* the event loop runs in loops. in each loop
 
 ### Lecture 7 - The event loop implementation
 
@@ -93,16 +105,15 @@ static uv_once_t init_once = UV_ONCE_INIT;
 ### Lecture 8 - Event Loop Ticks
 
 * event loop in every tick does the following
-* 1) Node looks at pendingTimers and sees if any functions are ready to be called (setTimeout, setInterval)
-* 2) Node looks at pendingOSTasks and pendingOperations and calls relevant callbacks
-* 3) Node pauses execution (momentarily). Continue when...
-*	- 	a new pendingOStask is done
-* 	- 	a new pendingOperation is done
-*	-	a timer is about to complete
-* if there was no wait the loop would run as fas as it could
-* 4) Look at pendingTimers (call any setImmediate)
-* 5) Handle any 'close' events
-* an example of a close event is a `readStream.on('close', () => { console.log('cleanup')});`
+	* 1) Node looks at pendingTimers and sees if any functions are ready to be called (setTimeout, setInterval)
+	* 2) Node looks at pendingOSTasks and pendingOperations and calls relevant callbacks
+	* 3) Node pauses execution (momentarily). Continue when...
+	*	- 	a new pendingOStask is done
+	* 	- 	a new pendingOperation is done
+	*	-	a timer is about to complete
+	* if there was no wait the loop would run as fas as it could
+	* 4) Look at pendingTimers (call any setImmediate)
+	* 5) Handle any 'close' events. an example of a close event is a `readStream.on('close', () => { console.log('cleanup')});`
 
 ### Lecture 9 - Is Node single Threaded?
 

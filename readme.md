@@ -117,4 +117,97 @@ static uv_once_t init_once = UV_ONCE_INIT;
 
 ### Lecture 9 - Is Node single Threaded?
 
-* 
+* a misconception about node is that is single trheaded
+* indeed event loop uses one thread
+* its more complicated than that
+	* node event loop -> single threaded
+	* Some of Node Framework/Std Lib -> Not single threaded. These functions run outhside of the event loop
+* we ll write some code to prove that
+* we create a js file *threads.js*
+* we import the pbkdf2 function `const crypto require('crypto')`
+* we call  pbkdf2 passing a callback thats executed after the crypto function finishes
+```
+crypto.pbkdf2('a','b',100000, 512, 'sha512', () => {
+	
+});
+``` 
+* this takes some time to run ~1sec
+* we ll add some code to benchmark how long it takes to execute
+
+### Lecture 10 - Testing for Single Threads
+
+* we add a new var before the crypto call to register timestamp `const start = Date.now()`
+* in the callback we add a cl to printout the time lapsed `console.log('1: ', Date.now() - start)`
+* we run the file `node thread.js` and get 1100 ms
+* we duplicate our crypto call changing just he printout
+```
+crypto.pbkdf2('a','b',100000, 512, 'sha512', () => {
+	console.log('2: ', Date.now() - start);
+});
+```
+* our print out is 
+```
+1:  1092
+2:  1095
+```
+* both calls are called at almost the exact time and end in the exact time bijna, so thery run in parallel
+* if it node was typically single threaded it would take 2sec to finish second call. it would wait till 1st finish and then would start. but async calls (ususlly going to system calls or node lib functions) spawn new threads so the main evenloop does not wait
+* a thread is a serial series of instructions
+
+### Lecture 11 - The libuv Thread Pool
+
+* we ll see what;s going on with crypto.pbkdf2 behind the scenes: the code we write calls the JS pbkdf2 method from nodels crypto module (lib) -> the crypto module delegats it to the V8 engine-> V8 engine finds the method in Nodes C++ side (src) -> pnkdf2 c++ impelemtation makes use of libuv lib (underlining OS) -> for some call libuv decides to do time consuming operations outside of the event loop -> libuv keeps and uses a thread pool
+* the libuv thread pool has a size of 4 and is used to run computational intesive tasks like pbkdf2
+
+### Lecture 12 - Threadpools with multithreading
+
+* from 2 we go to 5 crypto  calls to verify that libuv has a threadpool of size 4. we expect 4 calls to run in parallel and one to run after (2sec)
+* the results confirm our expectation, 4 finish together and wait for 5th
+```
+2:  976
+4:  980
+1:  1163
+3:  1171
+5:  1942
+```
+* in tutors laptop 4 first threats take 2s 5th 3s. in our machine 4 first threads 1s 5th 2s
+* his machine is dual core so OS scheduler assigns 2 threads (from thread pool) in each core using multithreading. each core needs double time to run both threads
+* our machine is quad-core so all 4 threads in thread pool run concurently in a separate core
+
+### Lecture 13 - Changing Threadpool Size
+
+* we ll change our code to change the number of threads created every time we start our program
+* we ll modify the libuv threadpool size using the envrionment variable `process.env.UV_THREADPOOL_SIZE = 2` reducing it to 2
+* the effecct is  that the concurrentcy drops to 2 (2 threads at a time) apart from main thread.
+* our quad core cpu performance equal a dual core
+* if we increase the threadpool to 5 (in quad-core i7) hyperthreading takes effect and we have increase in performance all finish around 1sec
+* the bottomline is that threadpool should equal cpu hyperthread max: in i7 -> 8
+
+### Lecture 14 - Common Threadpool Questions
+
+* Can we use the threadpool for Javascript code or can only nodeJS functions use it? => We can write custom JS that uses the thread pool
+* What functions in node std library use the threadpool ? => All 'fs' module functions. Some crypto stuff. Dependfs on OS (windows VS unix based)
+* How does this threadpool stuff fit into the event loop? => Tasks running in the threadpool are the 'pendingOperations' in our code example
+* pedingOperations in our test code represent code running in libuv threadpool
+
+### Lecture 15 - Explaining OS Operations
+
+* we ll try to explain the pendingOSTasks we included in our event loop dummy test file 'loop.js'
+* we ll follow a similar approach like in threadpool. write a test file and benchmark to evaluate whats going on behind the scenes
+* we make a new file *async.js*
+* we ll hit the google page and calculate how much time it takes to get response back
+* we require the https module `const https = require('https');`
+* we register timestamp `const start = Date.now();`
+* we make our async request
+```
+https.request('https://www.google.com', res => {
+	res.on('data', ()=> {});
+	res.on('end', () => {
+		console.log(Date.now() - start);
+	});
+}).end();
+```
+* the code in the request is low level http stuff. on the end event (whe reply get received we measure time passed)
+* it takes 469ms to do the request to google servers
+
+### Lecture 16 - 

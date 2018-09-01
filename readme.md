@@ -210,4 +210,88 @@ https.request('https://www.google.com', res => {
 * the code in the request is low level http stuff. on the end event (whe reply get received we measure time passed)
 * it takes 469ms to do the request to google servers
 
-### Lecture 16 - 
+### Lecture 16 - Libuv OS Delegation
+
+* we ll add more https.requests in our sample file and get evidence that some functions in node std lib dont use the libuv threadpool like pbkdf2 hashing
+* we ll call the request 7 times
+* all requests take the same amount of time to complete
+* what we saw is another evidence of libuv capabilities of delegating methods to the underlying OS
+* as some node std lib methods make use of libuv threadpool some others get delegated by libuv to the OS
+* its the OS that does the real http request
+* libuv issues the request and waits for the OS to emit a signal that a response as come back
+* OS decides if it needs a new thread or not
+
+### Lecture 17 - OS/Async Common Questions
+
+* what functions in node std lib use the OS async features? => Almost everything around networking for all OSs. some other stuff is OS specific
+* how does this os async stuff fit into the event loop? => tasks using the underlying OS are reflected in our 'pendingOSTasks' array
+* when we listen to a prot in our app the app stays open (event loop runs again and again)
+
+### Lecture 18 - Review
+
+* When we start a node program in a local computer: 
+	* process and execute code in index.js file (and imported files)
+	* STEP 2: do we still have work to do? look at timers, OS tasks, threadpool. NO? -> ext YES? -> continue
+	* run setTimeouts,setIntervals
+	* Run callbacks for OS tasks or threadpool tasks that are done. (this is usually 99% of JS code)
+	* pause and wait for stuff to happen
+	* run any 'setImmediate' functions
+	* handle close events
+	* go to STEP 2
+
+### Lecture 19 - Crazy Node behavior
+
+* we will merje the code from all the sections examples to a single project
+* we make a new file *multitask.js*
+* we put there all code from async.js and threads.js
+* we remove all doRequest calls
+* we keep only one from cryptocalls and put it in a doHash() wrapper function
+* we import fs in the file `const fs = require('fs');`
+* we ll use fs to read all the code we wrote in the single source code file
+```
+fs.readFile('multitask.js','utf8',()=> {
+	console.log('FS: ', Date.now() - start);
+});
+```
+* we run the file: we get *FS: 1* so it takes 1ms to read the file
+* we add a single `doRequest();` before the fs call and  call `doHash();` 4 times after the fs call
+* the console log output is 
+```
+554
+Hash:  980
+FS:  1000
+Hash:  983
+Hash:  1236
+Hash:  1277
+```
+* our FS call prints 2seconds when when it was running alone it took 1ms
+
+### Lecture 20 - Unexpected Event Loop Events
+
+* we ll explain why we see the one hash console log before fs and why fs readfile takes somuch time to complete
+* why we see the http finish right away?
+* FS module call runs in Threadpool
+* HTTP req is delegated to OS
+* crypto module makes use of the threadpool
+* OS call took less time (depends of network speed) while others roughly the same 1sec (hash time)
+* When we call fs.readFile()
+	* node gets some 'stats' on the file (requires HDD access)
+	* HD accessed, stats returned
+	* node requests to read the file
+	* HD accessed, file ocntents stramed back to app
+	* node returns the contents to us
+* what we see is that there are 2 async actions contained in readFile() and consequently 2 pauses when we wait to get file stats and when we wait to get file contents
+* 4 tasks (fs call and 3 of 4 hash functions) where loaded to the threadpool
+* the 3 threadpool threads try to calculat the hash of 3 hash tasks 
+* the 4th threadpool thread works on fs call. when he reaches to HDD, threadpool thread knows he is going to wait, so drops FS task and becomes available
+* the 4th hash task takes its place in the threadpool
+* at some point a hash task will finish (console log), its thread in threadpool becomes available so FS task takes its place
+* fs task resumes operation (its fast so it finished fast)
+* if we increase threadpool to 5, fs is kicked out from thrreadpool but resumes as the 4 hash tasks have their own in the pool. so fs task finishes first (fastest)
+* if we reduce threadpool to 1 fs finishes last
+
+## Section 2 - Enhancing Node Performance
+
+### Lecture 21 - Enhancing Performance
+
+* 

@@ -379,4 +379,64 @@ if(cluster.ismaster) {
 
 ### Lecture 27 - Benchmarking Server Performance
 
-* 
+* clustering cannot be scaled indefinetely. we cannot fork() too many childen. after a certain poiont it makes no sense
+* in some cases adding many children can be catastrophic for the app
+* we use aprogram to benchmark of our server.we open a second terminal in project dir
+* we run apache benchmark (ab) . we install it `sudo apt-get install apache2-utils`
+* to benchmark we run `ab -c 50 -n 500 localhost:3000/fast` 500 requests trying to send concurently 50 at a time.
+* we run it while having started our app
+* a good metric is requests/sec (we have 2455) or average time per request (20.365 ) or the distribution of requests serve time (we can plot it as histogram)
+
+### Lecture 28 - Benchmark Refactor
+
+* we ll refactor our index.js file and benchmark it to see when clustering starts giving us problems
+* we ll replace the doWork() method. its good at simulating a pause in our app but not good at simulating actual work. we need to do real difficult computations. we ll use the hashing function
+```
+	app.get('/', (req,res) => {
+		// doWork(5000);
+		crypto.pbkdf2('a','b',100000, 512, 'sha512', () => {
+			res.send('Hi there!');
+		});	
+	});
+```
+* we also restrict theadpool size to 1 `process.env.UV_THREADPOOL_SIZE = 1;`
+* we spawn only one child
+
+### Lecture 29 - Need More Children
+
+* we now have one child in our cluster and a cpu intesive task in out main route
+* we restart our server and run our benchmark 1 request in home route `ab -c 1 -n 1 localhost:3000/` our metrics are *Time taken for tests:   0.997 seconds*
+* we run our benchmart for 2 requests and concurency of 2 `ab -c 2 -n 2 localhost:3000/` it took 2070ms to be processed but our min is 1027ms so first request got services at ~1sec
+* what happens is: we have 2 requests in our test 1 worker and 1 thread in the pool. thread pool services 1st request and then the 2nd
+* we repeat the benchmark of 2 by forking 2 children in our app. now both take 1sec as each app instance tkaes erach request. (not on our machine)
+* how to match cpu cores to forked children
+```
+const os = require('os');
+const cpuCount = os.cpus().length;
+for (let i = 0; i < cpuCount; i += 1) {
+   // Match the children to CPU physical cores
+   cluster.fork();
+ }
+```
+* we increase fork to 6 children and do our benchmark for 6 requests. in tutors machine they take 3.5sec on our machine it took from 1 to 6 sec (no hyperthreading on i7) it does not execute 6 times faster. it depends on resources. if we increase thread pool (as we have quad core) it becomes better
+* he spawns children number equal to the cores of his machine  (2) and runs the benchmark of 6
+* we should not exceed the cheildren count far above the logical cores on our system
+
+### Lecture 30 - PM2 Installation
+
+* in a production app. the cluster master would monitor the health of children and maybe respawn them
+* we dont need to go in such detail as there is a ready made solution. the [PM2](https://pm2.io/) opensource node project
+* we find it in [github](https://github.com/Unitech/pm2)
+* we install it as a global `npm install -g pm2`
+
+### Lecture 31 - PM2 Configuration
+
+* pm2 will spawn multiple instances and monitor their health for us (if one crashes it spawns a new one)
+* we should remove the cluster related code from our project as pm2 will do all the stuff. we remove the code from our app (save it as index_cluster.js)
+
+* to start our app in cluster mode using pm2 we ll run `pm2 start index.js -i 0` -i sets the num of instances. when we enter 0 we leave pm2 decide the best num of instances to use (equal to the logical num of cpu cores on our machine). on our machine is spawns 8! instances
+* to stop it we run `pm2 delete <appname>`
+* by running `pm2 list` we can see the health of our instances
+* with `pm2 show <appname>` we get much more info on our cluster
+* with `pm2 monit` we get a dashboard like inteface for all instances
+* pm2 is used in production environments

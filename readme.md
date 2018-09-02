@@ -294,4 +294,89 @@ Hash:  1277
 
 ### Lecture 21 - Enhancing Performance
 
+* we will see 2 ways to mitigate the performance impact that event loop has on our node apps
+	* set node to work in cluster mode: start multiple copies of nmode that run our code with the aim of having multiple instances of the event loop (Recommended Approach)
+	* use worker threads. these worker threads will use the pool that is set by libuv when we start our app (Experimental Approach)
+
+### Lecture 22 - Express Setup
+
+* we ll set up a small express app and use it to demonstrate both performance improving techniques
+* we make a new file called *index.js* adding the bare minimum to run express (one route with a simple response)
+```
+const express = require('express');
+const app = express();
+
+app.get('/', (req,res) => {
+	res.send('Hi there!');
+});
+
+app.listen(3000);
+```
+* we import express with npm. first we init `npm init` and then `npm i --save express`
+* we start server with `node index.js` visit localhost:3000 in chirem and see the message
+* we could use nodemon to avoid restarting the app anytime we do a change. BUT. nodemon does not work well with Clustering
+
+### Lecture 23 - Blocking the Event Loop
+
+* whenever a request comes to our node server it gets processed by  the single thread. the singel thread contains the event loop. the single thread processes the request and returns the response
+* we get into issues when the incoming request takes a lot of time to process (e.g complex JS)
+* to simulate that we add a dummy function doWork() in our project which will overload the CPU for the amount of time we specify
+```
+function doWork(duration) {
+	const start = Date.now()
+
+	while(Date.now() -start < duration) {}
+}
+```
+* we add the function call in our route handling callback adding `doWork(5000);`
+* the code in the callback will run in the event loop. not in OS or threadpool. as it is vanilla JS. no lib calls
+* for 5sec our event loop can do nothing else but get stuck in the while loop
+* we confirm that by running the code and opening the localhost:3000. it takes 5+ seconds to load. if we open a second page it will take even longer
+* that is why JS is not good for doing complex Sync operations
+
+### Lecture 24 - Clustering in Theory
+
+* clustering work by launching simultaneously multiple instances of our application (multiple processes). 
+* there is an overuling parent process called cluster manager that monitors the health of our app instances
+* cluster manager does not run any app code. it can start/stop, send data to, administer app instances
+* when we run a node app from our terminal: node takes contents of our file -> [ executes it -> starts the event loop ] last two steps is the Nose Instance
+* When we use clustering we run the node app from terminal: the furst node instance that get launched when we use clustering is the cluster manager. the cluster manager is ther responsible for starting worker instances. these worker instances are responsible for processing the incoming requests. 
+* for starting the worker instances the cluster manager needs the cluster module from node standard library
+* cluster module contains the method fork `cluster.fork()`. when we call this method from cluster manager node internally goes back to index.js (source file) and executes it a second time, but in a slightly different mode. when it executes the file for a second time it starts the worker instance
+* so our source code file the 1st time it gets executed produces the cluster manager. for the consecutive times it gets executed from cluster.fork() produces worker instances
+
+### Lecture 25 - Forking Children
+
+* we 'll implement clustering in our tiny express app
+* we ll require in the cluster module `const cluster = require('cluster');`
+* we ll instroduce avery important property of the module the isMaster `cluster.isMaster`. it is true as this is the first execution of the index.js we are runnignt he cluster manager so the isMaster property is set to true
+* when we we fork off additional worker instances they will have the isMaster property false
+* we use this flag to determine what the program should do depending on the context (type of instance it is running in)
+* so we use it as a switch statement. if we are in master mode we fork,. if not run the app
+```
+// console.log(cluster.isMaster);
+// Is the file being executer in master mode?
+if(cluster.ismaster) {
+	// cause index.js to be executed again in child mode
+	cluster.fork();
+} else {
+	// i am child i am going to act like a server and do nothing else
+}
+```
+
+### Lecture 26 - Clustering in Action
+
+* currently we start one child with fork(). when we start just one child clustering does not make sense. we still  have only one instance of the event loop
+* if we want to start additional children we can call `cluster.fork()` more times. we call it 4 times in our app
+* to show the effect of clustering we add one more route with no delay this time
+```
+	app.get('/fast', (req,res) => {
+		res.send('This was fast!')
+	});
+```
+* we restart the server, open two tabs for the 2 routes implemented. fast route gets served immediately. as we had multiple severs to handle our requests
+* if we leave one fork() (one child) the fast route is not served. only after the delay
+
+### Lecture 27 - Benchmarking Server Performance
+
 * 

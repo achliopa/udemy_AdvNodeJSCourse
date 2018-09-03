@@ -418,6 +418,7 @@ for (let i = 0; i < cpuCount; i += 1) {
    cluster.fork();
  }
 ```
+
 * we increase fork to 6 children and do our benchmark for 6 requests. in tutors machine they take 3.5sec on our machine it took from 1 to 6 sec (no hyperthreading on i7) it does not execute 6 times faster. it depends on resources. if we increase thread pool (as we have quad core) it becomes better
 * he spawns children number equal to the cores of his machine  (2) and runs the benchmark of 6
 * we should not exceed the cheildren count far above the logical cores on our system
@@ -440,3 +441,89 @@ for (let i = 0; i < cpuCount; i += 1) {
 * with `pm2 show <appname>` we get much more info on our cluster
 * with `pm2 monit` we get a dashboard like inteface for all instances
 * pm2 is used in production environments
+
+### Lecture 32 - Webworker Threads
+
+* we saw how to use cluster mode to imporve performance when we need to do concurent heavy duty procssing in our app
+* worker threads is the other way but is experimental
+* we should not use either unless we have to
+* the use of workers threads uses the libuv threadpool. 
+* with worker threads we get direct access to it
+* worker threads give on average the same performance improvement like clustering
+* we ll build a small project to showcase worker threads
+* we ll use *webworkers-threads* npm package `npm install --save webworker-threads`
+
+### Lecture 33 - Worker Threads in Action
+
+* our app runs on a single thread that includes the event loop:
+* webworker-threads lib will create aseparate worker thread for us. because it runs on its own it can do complex calculations without blocking our app
+* BUT a lot od node std lib code already runs in libuv threadpool so in its own thread
+* when we use worker threads we can not freely reference theur variables from our app. we need to use an asyn messaging system with events: postMessage->onmessage
+* We create a worker object in our app (Worker Interface). this object (Worker Interface) creates the worker thread (Worker) and both communicate using postmessage and onmessage. when we call prost message the callback in on messase event will be invoked
+* we ll modify the *index.js* file again
+* we import worker class from worker-threads `const Worker = require('webworker-threads').Worker;`
+* we remove crypto method from http callback as itself it runs in libuv threadpool
+* we create a new worker object (Interface) in the http route callback passing in a function. 
+```
+app.get('/', (req,res) => {
+	const worker = new Worker(function() {
+		this.onmessage = function() {
+			let counter = 0;
+			while (counter <1e9) {
+				counter++;
+			}
+			postMessage(counter);	
+		}
+	});
+
+	worker. onmessage = function(myCounter) {
+		console.log(myCounter);
+	}
+
+	worker.postMessage();
+});
+```
+* this anonym0ous function has NO access to the scope outside of it.
+* we decalre also the comm functions for the Interface and the comm functions for the thread (inside the passed in anonymous function that is the thread code)
+* we use normal functions (keyword) and not arrow as we want to pass the context with this. if we used the arrow function this would refer to the route handler
+* when postmessage outside worker gets called the onmessage in the worker gets invoked. so there we do the  work and return the result with postmessage
+* in the interface onmessage we get the result and console log it
+
+### Lecture 34 - Benchmarking Workers
+
+* in our main https route handler we dont return as response just do our worker stuff.
+* we run our app `node index.js`. we hit our browser and check our terminal... worker response gets logged.
+* the result comes back as an object { data: 100000000 }
+* its time to benchmark the results using ab `ab -c 1 -n 1 localhost:3000/` rerun for more requests and compare results
+
+## Section 3 - Project Setup
+
+### Lecture 35 - The Next Phase
+
+* to avoid basic stuff we are going to clone a basic plain nodeJS App from github
+* the app has basic routing and auth setup
+* we ll pimp this app up with:
+	* Redis-Backend Caching
+	* Browser Based Integration Testing
+	* Continuous Integration (CI) Setup
+	* Scalable File/Image Upload
+* we will end up with a Sοlid, Production Ready App to showcase
+
+### Lecture 36 - Project Walkthrough
+
+* project recides in [github repo](https://github.com/StephenGrider/AdvancedNodeStarter)
+* we download it (or clone it)
+* we walkthrough the code its a typical express.js app:
+	* app main file is index.js
+	* we use mongouuse for mongodb connection
+	* we use passport.js for authentication
+	* we have production handlers
+	* restful routes
+* our project is a frontend-backend combo (fullstack)
+	* frontend uses create-react-app feamework (singlepage app)
+	* frontend-backend communicate with http
+	* Backend takes http request ->  Goes to Middlewares [uses body parser to extract data -> cookie session(auth, sessions) -> passport(oauth w/ google)] -> Routes 1) AuthRoutes 2) RequireLogin/BlogRoutes -> Reply to Frontend
+	* Both AuthRoutes and BlogRoutes -> Mongoose -> MogoDB
+	* User and Blog Models are stored in Mongoose
+* we install project dependencies with `npm install`
+* we need to install dependencies for the react project as well, so in the client folder we run `npm install` as well

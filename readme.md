@@ -610,3 +610,52 @@ app.get('/', (req,res) => {
 * we ll write code that caches any type of query mongoose can issue in our app
 * we ll handle record updates, expire data
 * cache is used for read actions
+
+### LEcture 42 - Redis Introduction
+
+* our caching server will be an instance of Redis (in memory tiny database)
+* redis data get lost once we restart our server
+* redis is FAST
+* we ll use node-redis lib to interact with redis server [npm redis]https://www.npmjs.com/package/redis()
+* node-redis *redis* lib does not give any documentation on how to manipulate data in redis
+* any redis command is just forwarded to the redis server
+
+### LEcture 43 - Installing Redis
+
+* we will install in on linux (x86 and ARM)
+* we unpack it an in the folder run 'make'
+* The binaries that are now compiled are available in the src directory. Run Redis with:
+```
+$ src/redis-server
+```
+* You can interact with Redis using the built-in client:
+```
+$ src/redis-cli
+redis> set foo bar
+OK
+redis> get foo
+"bar"
+```
+* we can check tha redis is running with `redis-cli ping` it replies with PONG
+
+### Lecture 45 - Getting and Setting Basic Values
+
+* we ll play with redis to see how it stores data
+* redis is a key value storage, much like a JS object stores values
+* we can use node lib redis to:
+	* we store with `set('hi','there')`
+	* we retrieve with `get('hi', (err,val) => {console.log(val)});`  => 'there'
+* get is async
+* our redis server runs on port 6379
+* we ll write some code to interact with it
+* we install the redis lib `npm install --save redis`
+* we run node cli and run a test program tha conects to redis sets and gets a value
+```
+const redis = require('redis')
+const redisUrl = 'redis://127.0.0.1:6379'
+const client = redis.createClient(redisUrl)
+client
+client.set('hi','there')
+cient.get('hi', (err,val) => {console.log(val)})
+```
+* to simplify our getters without writing the callback we can use `client.get('hi',console.log)` as we pass console.log as a callback . this is a trick

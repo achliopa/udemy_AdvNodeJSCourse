@@ -527,3 +527,86 @@ app.get('/', (req,res) => {
 	* User and Blog Models are stored in Mongoose
 * we install project dependencies with `npm install`
 * we need to install dependencies for the react project as well, so in the client folder we run `npm install` as well
+
+### Lecture 37 - Key Customization
+
+* to start our cloned app we run `npm run dev`
+* it launches chrome at localhost:3000
+* the app as is connects to a MongoDB instance (remote) with a readonly account. 
+* we need to configure aour own copy of mongoDB instance
+* in the cloned project there are files containing keys for accesing project resources.
+* keys are in config/ folder dev.js fopr dev and prod.js for prod
+* we use a google api key, and secret and mlab key. we ll replace them with our own
+
+### Lecture 38 - MongoDB Creation
+
+* we ll create a mongoDB instance in mLab
+* we log in and create a new instance (free tier) we name the db blog_dev
+* we go to db to create a user
+* a url is generated for our db.  we cp it in dev.js and add the user name:password
+* server restarts
+* now we can loging with google in our app because we have a db to store data
+
+### Lecture 39 - Routes Walkthrough
+
+* we log in and click on + button to add a blogpost
+* we write title, content and click next -> save
+* our blog appears on dashboard. 
+* if we click on it we see it in full page
+* our exrpess router serves 7 routes (4 auth routes and 3 blog routes)
+		* /auth/google => start google OAuth flow to log user in
+		* /auth/google/callback => where users get sent to after OAuth flow
+		* /auth/logout => logout current user
+		* /api/current_user => get the current user
+
+		* /api/blogs/:id => get the blog with specified ID
+		* GET api/blogs => get all blogs that belong to the current user
+		* POST /api/blogs => create a new blog
+* blog posts a re personal no else can view them
+* our routes are locates in routes/ folder
+
+## Section 4 - Data Caching with Redis
+
+### Lecture 40 - MongoDB Query Performance
+
+* we will add caching to our app
+* caching is a way to dramaticaly improve  the read performance of an app that uses mogoDB
+* caching can be used with any DB
+* we open devtools in chome and filter by XHR. we refresh our loged in homepage (blog list)
+* 3 requests are issued
+		* info: has to do with react takes 55ms
+		* current_user: 300ms (db involved)
+		* blogs: 300ms (db involved)
+* the flow is: visit localhost:3000/blogs -> react app loads in browser -> react app needs details about the current user and their blogs -> react app makes requests to get current user and blog list to backend -> express route handler sees request, tells mongoose to get records -> mongoose reaches to mongodb  fetches data -> express reports to react app
+* in blogRoutes.js /api/blogs route goes to mongoose blog model to get the record based on user id
+```
+  app.get('/api/blogs', requireLogin, async (req, res) => {
+    const blogs = await Blog.find({ _user: req.user.id });
+
+    res.send(blogs);
+  });
+```
+* everytime someone refreshes the page in our app we issue 2 requests to mongoDB
+* when we issue a mongoose query it sends a query in mongoDB
+* mongoDb uses an index, the index is used to retrieve data (documents) from a collection
+* in our db we have 2 collections. users and blogs
+* the index in mongoDB is efficient because wqe dont have to go to each record butr go directly to the record we want
+* the index is based on the *_id* proerty of each document in collection
+*  if we issue a query looking for a blog with a specific `title` so an other property except from id mongo cannot use indexing . it has to go in each and every document in collection
+* this is called a full collection scan and it takes time, it can lead to performance issues in our app. there are 2 sollutions
+	* add an index for the field we will use in our lookup: for every index we add in our collection it takes more to write a document in that collection. it also consumes more diskspace and memory
+	* use cache server (caching layer)
+
+### Lecture 41 - Query Caching Layer
+
+* one of the possible solutions for performance issues with mongoDB is to use a cache server (or a caching layer)
+* a normal MERN application serves a frontend (react) with a backend running express+mongoose on node, mongoose interfaces a mongoDB on a diff process or machine
+* the cache server stands between mongoose and mongoDB adn does the follwoing:
+	* if the query from mongoose has not been executed before it parses it to mongoDB
+	* the result of this query is stored in cache server before returned to mongoose
+	* if the query has been executed before it gets served from cache server
+* in depth: in cache server therre is a key-value storage key is the query and value the result
+	* if mongoose issues a query *Blog.findById('123')* cache server checks its storage. it does not find it. query is forwarded to mongoDB. mongo replies with *{ title: 'my', content: 'blog'}*. a new record is stored in cache list *'123' : { title: 'my', content: 'blog'}*
+* we ll write code that caches any type of query mongoose can issue in our app
+* we ll handle record updates, expire data
+* cache is used for read actions

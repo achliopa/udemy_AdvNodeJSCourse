@@ -659,3 +659,57 @@ client.set('hi','there')
 cient.get('hi', (err,val) => {console.log(val)})
 ```
 * to simplify our getters without writing the callback we can use `client.get('hi',console.log)` as we pass console.log as a callback . this is a trick
+
+### Lecture 46 - Redis Hashes
+
+* we ll see another datastracture more useful for our caching problem. the *Nested Hash*
+* its like a nested javascript object. we have the keys but the value is it self a collection of key:value pairs (a nested hash)
+* to set a nested hash we use `hset('spanish','red','rojo')`. we pass in:
+	* the overall key: 'spanish'
+	* the key of the hash: 'red'
+	* the nested hash value: 'rojo'
+* to get a nested hash value we use `hget('spanish','red',(err,val) => console.log(val))` we get back rojo passing a cb
+* if we express the key value pair as a JS obj literal we get
+```
+const redisValues = {
+	hi: 'there'
+};
+```
+* a nested hash in JS would look like
+```
+const redisValues = {
+	spanish: {
+		red: 'rojo',
+		orange: 'naranja',
+		blue: 'azul'
+	},
+	german: {
+		red: 'rot',
+		orange: 'orange',
+		blue: 'blau'
+	}
+};
+```
+* in node cli we write our small testing script
+```
+const redis = require('redis')
+const redisUrl = 'redis://127.0.0.1:6379'
+const client = redis.createClient(redisUrl)
+client.hset('german','red','rot')
+client.hget('german','red',console.log)
+```
+
+### Lecture 47 - One Redis Gotcha
+
+* in redis we can store nums and letters. we cannot store a plain JS object in redis. the following command passes but object is stringified with .toString() method. but what we get back is [Object object]
+```
+client.set('colors', { red: 'rojo' }) 
+```
+* what we should do to store objects in redis is stringify them ourselves. (overwrite the toString() method?) or better turn them to JSON w/ stringify
+```
+client.set('colors',JSON.stringify({ red: 'rojo' }))
+client.get('colors', console.log) # '{"red":"rojo"}' we need to parse it
+client.get('colors', (err,val) => console.log(JSON.parse(val)))
+```
+
+### Lecture 48 - Cache Keys

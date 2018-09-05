@@ -713,3 +713,99 @@ client.get('colors', (err,val) => console.log(JSON.parse(val)))
 ```
 
 ### Lecture 48 - Cache Keys
+
+* we ll add caching to one route (query) in our app
+* in the get('/api/blogs') we make a single query to mongo `Blog.find({ _user: req.user.id });` searching by user id. not blog id
+* we want to cache that query. a possible solution is use the query as key and the query result as value. 
+* the result is going to be a list of blog posts.
+* the quaery is a bit ambiguous. we want query keys that are consistent but unique between query executions
+* to identify the key to our cache we need to look in our query and find an element that is consistent and unique . in our query we use the Blog collection and the User._id the only providing consisntency and uniqueness is User._id
+
+### Lecture 49 - Promisifying a Function
+
+* we ll write all the redis related code in the route callback for easy deletion later on
+* we add our setup code
+```
+    const redis = require('redis');
+    const redisUrl = 'redis://127.0.0.1:6379';
+    const client = redis.createClient(redisUrl);
+```
+* we need to add switch logic so that we go t redis cache when we have the query in our cache
+* our getter reteurna callback and we end up with nested callbacks. we will use promises.
+* redis does not natively support promises so we need to promisify our code
+* we import built in util lib of node `const util = require('util');`
+* we use a method called promisify. it accept any method that returns a callback and makes it return a promise instead `client.get = util.promisfy(client.get)` we pass in a ref to function amd get a reference ready to use
+* we use async/await that comes with promise ` const cachedBlogs = await client.get(req.user.id);`
+
+### Lecture 50 - Caching in Action
+
+* we implement the control logic. 
+* cached data are stored as JSON
+
+```
+    // if yes respond to the request right away and return
+    if(cachedBlogs) {
+      return res.send(JSON.parse(cachedBlogs))
+    }
+    // if no we need to respond to the r equest and  update our cache to store data
+    const blogs = await Blog.find({ _user: req.user.id });
+
+    res.send(blogs);
+
+    client.set(req.user.id,JSON.stringify(blogs));
+  });
+```
+* we test the app. first time gets served by mongo , second by cache
+* to delete all data that run in redis
+* we use node redis lib to delete.
+* we setup the client conection in node and we run `client.flushall()`
+* we  have still delay but its because we setup redis connection in each request
+
+### Lecture 52 - Caching Issues
+
+* current implementation has some issues
+* we make a new request. when we refresh its not there as redis does not keep track of the changes in the users blog list
+* we want to avoid adding caching specific login in every route handler to synchronize our cache with the changes in mongodb
+* if we add an other collection of resources in db related to user (images,tweets) the the consistency of using user.id as key is lost. our currnet caching setup is good for one resource
+
+### Lecture 53 - The Ultimate Caching Solution
+
+* Problem Solutions
+	* caching code isnt really reusable anywhere else in our codebase => hook in to Mongoose query generation and execution process
+	* cached values never expire => add timeout to values assigned to redis. also add ability to reset all values tied to some specific event
+	* cache keys won't work when we intreoduce other collections or query options => figure out a more robust solution for generating cache keys
+* to solve first issue we need to understand queries in mongoose (customize queries)
+	* in mongoose we build our query object and then execute it. 
+	* our query object can be further customized
+*we want to build our query and before executing it going to redis cache 
+* 1st possible way to trigger the query to go to mongo `query.exec((err,result)=>{console.log(result)});`
+* 2nd possible way to trigger the query to go to mongo `query.then(result => console.log(result));`
+* 3rd possible way is using the async/await syntax `const result = await query;`
+* to make our code reusable we should override the exec method to add the caching logic
+```
+query.exec = function() {
+	//to check to see if this query has already been executed
+	//and if it has return the result right away
+	const result = client.get('query key')
+	if (result) {
+		return result;
+	}
+	// otherwise issue the query as normal and 
+	const result = runtheoriginalqueryfunction();
+	// then store the result in redis cache
+	client.set('query key', result);
+	return result;
+}
+```
+* expiration of data is buil in redis. we can tell it when to expoire the data when we set them in
+* in .set() we use the keyword 'EX' and the expiration time in seconds
+```
+client.set('color','red','EX',30);
+```
+* customizing our existing blog query by adding one more para. user.id loses also its uniqueness
+* we need to encapsulate in the key the collection it operates on and all the querey customization params that make it unique. we can use the query.getOptions() method to get them all as an object
+* we can stringify it and use it as key
+
+### Lecture 54 - Patching Mongoose's Exec
+
+* we try to extend the query.exec method

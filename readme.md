@@ -761,14 +761,14 @@ client.get('colors', (err,val) => console.log(JSON.parse(val)))
 * we setup the client conection in node and we run `client.flushall()`
 * we  have still delay but its because we setup redis connection in each request
 
-### Lecture 52 - Caching Issues
+### Lecture 51 - Caching Issues
 
 * current implementation has some issues
 * we make a new request. when we refresh its not there as redis does not keep track of the changes in the users blog list
 * we want to avoid adding caching specific login in every route handler to synchronize our cache with the changes in mongodb
 * if we add an other collection of resources in db related to user (images,tweets) the the consistency of using user.id as key is lost. our currnet caching setup is good for one resource
 
-### Lecture 53 - The Ultimate Caching Solution
+### Lecture 52 - The Ultimate Caching Solution
 
 * Problem Solutions
 	* caching code isnt really reusable anywhere else in our codebase => hook in to Mongoose query generation and execution process
@@ -806,6 +806,141 @@ client.set('color','red','EX',30);
 * we need to encapsulate in the key the collection it operates on and all the querey customization params that make it unique. we can use the query.getOptions() method to get them all as an object
 * we can stringify it and use it as key
 
-### Lecture 54 - Patching Mongoose's Exec
+### Lecture 53 - Patching Mongoose's Exec
 
 * we try to extend the query.exec method
+* we look in github mongoose lib for the implementation of exec method (query.js)
+* we go to function Query (mongoose uses classic prototype inheritance)
+* prototype inheritance: function Query() has prototype.find, prorrtype.exec, prototype.limit => new Query() => query instance has .find() .exec() .limit()
+* Query.protoype.exec impelementation
+```
+Query.prototype.exec = function exec(op, callback) {
+  const _this = this;
+
+  if (typeof op === 'function') {
+    callback = op;
+    op = null;
+  } else if (typeof op === 'string') {
+    this.op = op;
+  }
+
+  if (callback != null) {
+    callback = this.model.$wrapCallback(callback);
+  }
+
+  return utils.promiseOrCallback(callback, (cb) => {
+    if (!_this.op) {
+      cb();
+      return;
+    }
+
+    this[this.op].call(this, (error, res) => {
+      if (error) {
+        cb(error);
+        return;
+      }
+      cb(null, res);
+    });
+  });
+};
+
+```
+* the method always returns a promise
+* we ll write our patched exec funtion in services folder in anew file *cache.js*
+* we import mongoose, we get a reference to the default mongouse query exec function
+```
+const mongoose = require('mongoose');
+const exec = mongoose.Query.prototype.exec;
+```
+* our modification is appliec as a classical function to make use of this para, and passing in arguments in the default function
+```
+mongoose.Query.prototype.exec = function() {
+	console.log('I AM ABOUT TO RUN A QUERY');
+	return exec.apply(this,arguments);
+}
+```
+* we import our file to index.js
+* we run the server and refresh page. we see the log in console. we are intercepting successfuly the mongoose method
+
+### Lecture 54 - Restoring Blog Routes Handler
+
+* we ll clean up the api blog route callaback from all the caching logic we have added
+* it now is resoted to the original content
+```
+  app.get('/api/blogs', requireLogin, async (req, res) => {
+    const blogs = await Blog.find({ _user: req.user.id });
+    res.send(blogs)
+  });
+```
+
+### Lecture 55 - Unique Keys
+
+* we are now ready to implement cache functionality in the overloaded mongoose exec method.
+* first we need to sort out the key issue. how to come up with a consistent and unique key
+* we need to get an insight in the mongoose query object so we cl it in our function `console.log(this.getQuery());` this refers to the query object we are about to execute
+* what we get is an object `{ _id: 5b8d17ced87da20fd8cba5c9 }`
+* we actually get 3 objects 2first with same id . the first requests the user, the second requests the user to see that he is logged in. the 3rd requests the blog posts
+* query id can serve us but we need to add the collection we are querying on
+* to get the collection name in our exec method we use `console.log(this.mongooseCollection.name)`
+* we get the collection name in colsole
+* we ll combine the 2 in an object `{ _id: 5b8d17ced87da20fd8cba5c9, collection: 'users' }` we will stringify it and use it a s a key
+
+### Lecture 56 - Key Creation
+
+* we need to make a copy of the result of getQuery(). we use the Object.assign() method filling an empty object `Object.assign({}, this.getQuery(), { collection: this.mongooseCollection.name });`
+* we do this to avoid modifying the query object
+
+### Lecture 57 - Restoring Redis Config
+
+* we add redis setup in our cache file
+```
+const redis = require('redis');
+const redisUrl = 'redis://127.0.0.1:6379';
+const client = redis.createClient(redisUrl);
+const util = require('util');
+client.get = util.promisify(client.get);
+```
+* we stringify our key
+```
+const key = JSON.stringify(Object.assign({}, this.getQuery(), { collection: this.mongooseCollection.name }));
+```
+
+### Lecture 58 - Cache Implementation
+
+* we implement switch logic and we console.log
+```
+	// see if we have a have a value for key in redis
+	const cacheValue = await client.get(key)
+	// if we do return that
+	if (cacheValue) {
+		console.log(cacheValue)
+	}
+	// otherwise issue a query
+
+	const result = await exec.apply(this,arguments);
+	console.log(result);
+```
+* our query result gets loged out
+
+### Lecture 59 - Resolving Values
+
+* our exec in mongoose returns mongoose document
+* our redis cache stores only JSON so we need to modigy and return a mongoose doc
+* what we got back was a mongodb model instannce (document)
+```
+{ _id: 5b8d17ced87da20fd8cba5c9,
+[0]   googleId: '116159247268436008865',
+[0]   displayName: 'Athanasios Chliopanos',
+[0]   __v: 0 }\
+```
+* we can even call a method on the return.validate thats a mongodb docuemnt method to prove wea re getting back a doc
+* we take the doc turn it to Json and store it to redis `client.set(key, JSON.stringify(result));`
+* we test. second time redis cached JSON query gets spit to console
+* we parse it to transform it back to mongo doc
+* our user querys gets console logs. our blog query not and not retirned to react
+
+### Lecture 60 - Hydrating Models
+
+* when we try to return in our overloaded exec method json parsed data our app does not behave right
+* our app thinks we are logged in but without blogposts
+* it has to do with the returned type. we return palin JS object but we need to retrn mongoose documents (model instanmce)

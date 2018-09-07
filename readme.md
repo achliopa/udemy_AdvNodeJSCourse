@@ -943,4 +943,27 @@ const key = JSON.stringify(Object.assign({}, this.getQuery(), { collection: this
 
 * when we try to return in our overloaded exec method json parsed data our app does not behave right
 * our app thinks we are logged in but without blogposts
-* it has to do with the returned type. we return palin JS object but we need to retrn mongoose documents (model instanmce)
+* it has to do with the returned type. we return palin JS object but we need to retrn mongoose documents (model instance) witht he call `new this.model(JSON.parse(cacheValue));`
+* we return it but still we dont see the posts on react
+* we have 2 types of values that we store in redis
+	* model instances
+	* arrays of models
+* in our code wa assume we will get back just one record stringified
+
+### Lecture 61 - Hydrating Arrays
+
+* we need to do things differently to handle arrays
+* if we have an array we have to map each element ot an mongose doc
+```
+	if (cacheValue) {
+		// const doc = new this.model(JSON.parse(cacheValue));
+		const doc = JSON.parse(cacheValue);
+		return Array.isArray(doc) 
+			? doc.map(d => new this.model(d))
+			: new this.model(doc); 
+	}
+```
+
+### Lecture 62 - Toggleable Cache
+
+* 

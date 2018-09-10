@@ -966,4 +966,15 @@ const key = JSON.stringify(Object.assign({}, this.getQuery(), { collection: this
 
 ### Lecture 62 - Toggleable Cache
 
-* 
+* we are implementing caching functionality in the exec methon
+* exec method is called all the time and this causes delay as all queries are cached
+* we dont want to cache all as redis is in-memory and ram is expensive.
+* we ll put the cache logic in a separate method we will chain in our query when we want to cache* we will make cache() as a prototype method of the Query class. so we will be able to call it from query instances
+* in this method we set a property to the query instance (flag)
+* Blog.find() creates an instance so we can call cache() on it to set a flag
+```
+mongoose.Query.prototype.cache = function() {
+	this.useCache = true;
+}
+```
+* this flag is avalaibale in the overloaded exec method to act as a switch

@@ -975,6 +975,259 @@ const key = JSON.stringify(Object.assign({}, this.getQuery(), { collection: this
 ```
 mongoose.Query.prototype.cache = function() {
 	this.useCache = true;
+	return this;
 }
 ```
-* this flag is avalaibale in the overloaded exec method to act as a switch
+* this refers to the query instance
+* to make this method chainable we must return this
+* this flag is avalaibale in the overloaded exec method to act as a switch. we use it
+```
+if (!this.useCache) {
+	return exec.apply(this,arguments);
+}
+```
+* in our blogroute we chain the cache method only in the blogfind query `const blogs = await Blog.find({ _user: req.user.id }).cache()`
+* we refresh the app. to test we add a 3rd post. it do not appear (cache in effect) we remove cache chain method and it appears (not cached)
+
+### Lecture 63 - Cache Expiration
+
+* redis offers auto cache expiration by specing a expiration time when we store the data.
+* we can programmaticaly control cache expiration
+* to do auto cache in the .exec overloaded method when we set `client.set()` we will add an extrea param for time in sec `client.set(key, JSON.stringify(result), 'EX', 10)` for 10 sec
+* this applies to new redis caches
+
+### Lecture 64 - Forced Cache Expiration
+
+* the problem we want to solve is to update our cache when we update the query content (or even erase the cache)
+* we want to erase a slice of cach related to a user
+* we reimplkement our cache storage schema. all user data will be stored in separate nested hashes: key: user.id: 1 => value: [nested key: {user.id: 1, collection: 'blogs'}, nested value: result of query]
+* whenever a user updates its conetnt his nested cache gets erased, other users caches stay intact
+
+### Lecture 65 - Nested Hashes
+
+* we refactor our cache.js file to use our new caching schema
+* we ll see how to make top level key paramtrical
+* in the a.cache() method we ll specify the type of key to use. this will be done in an options object passed in. 
+* key must be a num or string so we use the stringify helper
+* if someone does not pass a key we use empty string
+```
+mongoose.Query.prototype.cache = function(options = {}) {
+	this.useCache = true;
+	this.hasKey = JSON.stringify(options.key || '');
+	return this;
+}
+```
+* as we work with nested hashes we will use redis hget and hset methods `const cacheValue = await client.hget(this.hashKey, key)`
+* we also modify the promisify method for hget
+* in our blogroute we need to pass a key param in cache call so we pass cache({key: req.user.id})
+
+### Lecture 66 - Clearing Nested hashes
+
+* we ll now see how to forcibly clear the hash
+* we ll define a new method in cache.js file and export it as part of an object
+* we define a method clearHash passing in the hashKey. we want to delete all info related to that key (after stringifying it)
+```
+clearhash(hashKey) {
+	client.del(JSON.stringify(hashKey))
+}
+```
+* we import the method in blogroutes
+* we will use this clear out when we create new blogs (post request in routes)
+* we add `clearHash(req.user.id)` after the try catch statement
+* we test
+
+### Lecture 67 - Automated Cache Clearing with Middleware
+
+* we ll refactor using express js middleware system
+* in the middlewares folder we add a new file *cleanCache.js*
+* we require in the cleaHash method `const { c```
+mongoose.Query.prototype.cache = function() {
+	this.useCache = true;
+	return this;
+}
+```
+* this refers to the query instance
+* to make this method chainable we must return this
+* this flag is avalaibale in the overloaded exec method to act as a switch. we use it
+```
+if (!this.useCache) {
+	return exec.apply(this,arguments);
+}
+```
+* in our blogroute we chain the cache method only in the blogfind query `const blogs = await Blog.find({ _user: req.user.id }).cache()`
+* we refresh the app. to test we add a 3rd post. it do not appear (cache in effect) we remove cache chain method and it appears (not cached)
+
+### Lecture 63 - Cache Expiration
+
+* redis offers auto cache expiration by specing a expiration time when we store the data.
+* we can programmaticaly control cache expiration
+* to do auto cache in the .exec overloaded method when we set `client.set()` we will add an extrea param for time in sec `client.set(key, JSON.stringify(result), 'EX', 10)` for 10 sec
+* this applies to new redis caches
+
+### Lecture 64 - Forced Cache Expiration
+
+* the problem we want to solve is to update our cache when we update the query content (or even erase the cache)
+* we want to erase a slice of cach related to a user
+* we reimplkement our cache storage schema. all user data will be stored in separate nested hashes: key: user.id: 1 => value: [nested key: {user.id: 1, collection: 'blogs'}, nested value: result of query]
+* whenever a user updates its conetnt his nested cache gets erased, other users caches stay intact
+
+### Lecture 65 - Nested Hashes
+
+* we refactor our cache.js file to use our new caching schema
+* we ll see how to make top level key paramtrical
+* in the a.cache() method we ll specify the type of key to use. this will be done in an options object passed in. 
+* key must be a num or string so we use the stringify helper
+* if someone does not pass a key we use empty string
+```
+mongoose.Query.prototype.cache = function(options = {}) {
+	this.useCache = true;
+	this.hasKey = JSON.stringify(options.key || '');
+	return this;
+}
+```
+* as we work with nested hashes we will use redis hget and hset methods `const cacheValue = await client.hget(this.hashKey, key)`
+* we also modify the promisify method for hget
+* in our blogroute we need to pass a key param in cache call so we pass cache({key: req.user.id})
+
+### Lecture 66 - Clearing Nested hashes
+
+* we ll now see how to forcibly clear the hash```
+mongoose.Query.prototype.cache = function() {
+	this.useCache = true;
+	return this;
+}
+```
+* this refers to the query instance
+* to make this method chainable we must return this
+* this flag is avalaibale in the overloaded exec method to act as a switch. we use it
+```
+if (!this.useCache) {
+	return exec.apply(this,arguments);
+}
+```
+* in our blogroute we chain the cache method only in the blogfind query `const blogs = await Blog.find({ _user: req.user.id }).cache()`
+* we refresh the app. to test we add a 3rd post. it do not appear (cache in effect) we remove cache chain method and it appears (not cached)
+
+### Lecture 63 - Cache Expiration
+
+* redis offers auto cache expiration by specing a expiration time when we store the data.
+* we can programmaticaly control cache expiration
+* to do auto cache in the .exec overloaded method when we set `client.set()` we will add an extrea param for time in sec `client.set(key, JSON.stringify(result), 'EX', 10)` for 10 sec
+* this applies to new redis caches
+
+### Lecture 64 - Forced Cache Expiration
+
+* the problem we want to solve is to update our cache when we update the query content (or even erase the cache)
+* we want to erase a slice of cach related to a user
+* we reimplkement our cache storage schema. all user data will be stored in separate nested hashes: key: user.id: 1 => value: [nested key: {user.id: 1, collection: 'blogs'}, nested value: result of query]
+* whenever a user updates its conetnt his nested cache gets erased, other users caches stay intact
+
+### Lecture 65 - Nested Hashes
+
+* we refactor our cache.js file to use our new caching schema
+* we ll see how to make top level key paramtrical
+* in the a.cache() method we ll specify the type of key to use. this will be done in an options object passed in. 
+* key must be a num or string so we use the stringify helper
+* if someone does not pass a key we use empty string
+```
+mongoose.Query.prototype.cache = function(options = {}) {
+	this.useCache = true;
+	this.hasKey = JSON.stringify(options.key || '');
+	return this;
+}
+```
+* as we work with nested hashes we will use redis hget and hset methods `const cacheValue = await client.hget(this.hashKey, key)`
+* we also modify the promisify method for hget
+* in our blogroute we need to pass a key param in cache call so we pass cache({key: req.user.id})
+
+### Lecture 66 - Clearing Nested hashes
+
+* we ll now see how to forcibly clear the hash
+* we ll define a new method in cache.js file and export it as part of an object
+* we define a method clearHash passing in the hashKey. we want to delete all info related to that key (after stringifying it)
+```
+clearhash(hashKey) {
+	client.del(JSON.stringify(hashKey))
+}
+```
+* we import the method in blogroutes
+* we will use this clear out when we create new blogs (post request in routes)
+* we add `clearHash(req.user.id)` after the try catch statement
+* we test
+
+### Lecture 67 - Automated Cache Clearing with Middleware
+
+* we ll refactor using express js middleware system
+* in the middlewares folder we add a new file *cleanCache.js*
+* we require in the cleaHash method `const { c```
+mongoose.Query.prototype.cache = function() {
+	this.useCache = true;
+	return this;
+}
+```
+* this refers to the query instance
+* to make this method chainable we must return this
+* this flag is avalaibale in the overloaded exec method to act as a switch. we use it
+```
+if (!this.useCache) {
+	return exec.apply(this,arguments);
+}
+```
+* in our blogroute we chain the cache method only in the blogfind query `const blogs = await Blog.find({ _user: req.user.id }).cache()`
+* we refresh the app. to test we add a 3rd post. it do not appear (cache in effect) we remove cache chain method and it appears (not cached)
+
+### Lecture 63 - Cache Expiration
+
+* redis offers auto cache expiration by specing a expiration time when we store the data.
+* we can programmaticaly control cache expiration
+* to do auto cache in the .exec overloaded method when we set `client.set()` we will add an extrea param for time in sec `client.set(key, JSON.stringify(result), 'EX', 10)` for 10 sec
+* this applies to new redis caches
+
+### Lecture 64 - Forced Cache Expiration
+
+* the problem we want to solve is to update our cache when we update the query content (or even erase the cache)
+* we want to erase a slice of cach related to a user
+* we reimplkement our cache storage schema. all user data will be stored in separate nested hashes: key: user.id: 1 => value: [nested key: {user.id: 1, collection: 'blogs'}, nested value: result of query]
+* whenever a user updates its conetnt his nested cache gets erased, other users caches stay intact
+
+### Lecture 65 - Nested Hashes
+
+* we refactor our cache.js file to use our new caching schema
+* we ll see how to make top level key paramtrical
+* in the a.cache() method we ll specify the type of key to use. this will be done in an options object passed in. 
+* key must be a num or string so we use the stringify helper
+* if someone does not pass a key we use empty string
+```
+mongoose.Query.prototype.cache = function(options = {}) {
+	this.useCache = true;
+	this.hasKey = JSON.stringify(options.key || '');
+	return this;
+}
+```
+* as we work with nested hashes we will use redis hget and hset methods `const cacheValue = await client.hget(this.hashKey, key)`
+* we also modify the promisify method for hget
+* we ll define a new method in cache.js file and export it as part of an object
+* we define a method clearHash passing in the hashKey. we want to delete all info related to that key (after stringifying it)
+```
+clearhash(hashKey) {
+	client.del(JSON.stringify(hashKey))
+}
+```
+* we import the method in blogroutes
+* we will use this clear out when we create new blogs (post request in routes)
+* we add `clearHash(req.user.id)` after the try catch statement
+* we test
+learHash } = require('../services/cache')`
+* we export our method using middleware rules
+* our middleware will run before the route handler but we dont want to delete the cache before we event attempt to create the post. we dont want that
+* express does not allow us to add middleware after the route handler (we would have to call next() in the handler)
+* a hack is to make the midddleware function async using async/awiatr
+* we make next() await and add after that the clearhash. in that sense we wait till next method is done (handler) and after we clear the hash
+```
+module.exports = async (req,res,next) => {
+	await next();
+
+	clearHash(req.user.id);
+}
+```
+* we import the middleware export in blogroutes and add it in the post route after login

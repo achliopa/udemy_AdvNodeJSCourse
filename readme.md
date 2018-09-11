@@ -1231,3 +1231,51 @@ module.exports = async (req,res,next) => {
 }
 ```
 * we import the middleware export in blogroutes and add it in the post route after login
+
+## Section 5 - Automated Headless Browser Testing
+
+### Lecture 68 - Testing Flow
+
+* we will setup a testing pipeline inside our app.
+* with unit testing we assert that one piece of our app is working the way we expect
+* with integration testing we make sure that multiple units work together correctly
+* the pipeline we l set up will focus on integration testing
+* the flow we will implement will be: start react and express apps => run 'npm run test' => start jest test suite => step 4: boot up a 'headless' version of chromium => programmatically instruct chromium to visit 'localhost:3000' => programmatically instruct chromium to click elements on screen => make assertion about content on screen => repeat with next test (goto step 4)
+* we can use other test suites (like mocha)
+* chromium is an open source browser (base of chrome)
+* headless browser is a browser without UI
+* we have it as an npm module installed in the base project
+
+### Lecture 69 - Testing Challenges
+
+* need to somehow launch chromium programmatically and interact with it from a test suite
+* how do we make asertions in jest about stuff that is happening on chrome window?
+* how do we simmulate logging in as a user? we are going through google OAuth (create test google account ?!?)
+
+### Lecture 70 - Commands Around Testing
+
+* we add in pacjage.json the test script which is for now simple (no config) `"test": "jest"`
+* jest  is already installed as npm package
+* puppeteer is a module that laucnches a chromium browser and allow us to programatically interact with it in JS
+* we can  now run tests with `npm run test`
+
+### Lecture 71 - First jest Test
+
+* we make a new folder for our test files called tests
+* in the tests folder we add our first test file 'header.test.js'. the neaming convention header for the functionality we want to test. .test.js is used by jester to locate test files
+* we add our first test to show the jester syntax
+```
+test('Add two numbers', () => {
+	const sum = 1 + 2;
+	expect(sum).toEqual(3);
+});
+```
+* we run tests and it passes
+
+### Lecture 72 - Launching Chromium Instances
+
+* we ll see how puppeteer works: Puppeteer: stats up chromium => Browser(JS Obj): represents an open browser window => Page (JS object): Represents one individual tab
+* for each test we ll create 1 broser and 1 page
+* we import puppeteer in our test file `const puppeteer = require('puppeteer');`
+* we create a new test and launch a browser instance `const browser = await puppeteer.launch({});`
+* we pss an empty object. the object is used to pass options.

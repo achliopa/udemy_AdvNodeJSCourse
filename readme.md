@@ -1278,4 +1278,16 @@ test('Add two numbers', () => {
 * for each test we ll create 1 broser and 1 page
 * we import puppeteer in our test file `const puppeteer = require('puppeteer');`
 * we create a new test and launch a browser instance `const browser = await puppeteer.launch({});`
-* we pss an empty object. the object is used to pass options.
+* we pss an empty object. the object is used to pass options. the method is async oper. 
+* we mark the test func as async
+* we createa anew browser page with `const page = await browser.newPage();`
+* for first test we dont want our browser to be headless so in the config option we pass `headless:false`
+* we run our test and see the browser pop up
+
+### LEcture 73 - Chromium navigation
+
+* our window is not closed after we run the test. in an auto test env we would expect it to close
+* when we close test ends
+* the flow we want to implement in our test is: launch chromium => navigate to app => click out stuff on screen => use a DOM selector to retrieve the content of an element => write assertion to make sure the content is correct => repeat
+* we want to test navigation to our app so  we add `await page.goto('localhost:3000');`
+* we run test (our app should be running already to test it)

@@ -1291,3 +1291,172 @@ test('Add two numbers', () => {
 * the flow we want to implement in our test is: launch chromium => navigate to app => click out stuff on screen => use a DOM selector to retrieve the content of an element => write assertion to make sure the content is correct => repeat
 * we want to test navigation to our app so  we add `await page.goto('localhost:3000');`
 * we run test (our app should be running already to test it)
+
+### Lecture 74 - Extracting Page Content
+
+* for our text we need to tinteract witht he page extracting the test for asserting its content
+* we ll use a dom selector to retrieve dom elements (css selectors)
+* we inspect the page (shif+ctrl+i) we are interested in the logo element.
+* the logo element has a class class="left brand-logo". we need a css selector for that `$('a.brand-logo')` to get the content in it `$('a.brand-logo').innerHTML`
+*  in out test to extract the logo text we use `const text = await page.$eval('a.brand-logo', el => el.innerHTML);`
+* next we add our assertion `expect(text).toEqual('Blogster');`
+
+### Lecture 75 - Puppeteer - Behind the Scenes
+
+* we will explain how puppeteer works in extracting info from the html
+* jest test runs in node. this is a process
+* when puppeteer launches a browser instance this is another process
+* puppeteer takes our jest code serializes it and sends it to the chromium. then gets back the results.
+* the callback el => el.innerHTML gets sent  to browser. we can verify it in browser console by running
+```
+const func = el => el.innerHTML
+func.toString()
+```
+* what we get is what we send to browser with puyppeteer from jest test. what puppeterr gets back from browser is stored in text through an async call
+* $eval is avalid JS identifyer used by puppeteer (JQuery style)
+
+### Lecture 76 - DRY Tests
+
+* we will refactor code to put the reusable part (test setup) into a befoare each block
+```
+let browser;
+let page;
+
+beforeEach(async () => {
+	browser = await puppeteer.launch({ headless: false});
+	page = await browser.newPage();
+	await page.goto('localhost:3000');
+}):
+```
+
+### Lecture 77 - Browser Termination
+
+* we add an afterEach statement to follow the DRY rule.
+```
+afterEach(async () => {
+	await browser.close();
+});
+```
+
+### Lecture 78 - Asserting OAuth Flow
+
+* the only other thing to test in header is the login link
+* we need to programmatically click it and see that )Authflow is ttriggered
+* we add a test
+* we look at puppeteer docs on [github repo](https://github.com/GoogleChrome/puppeteer) to see how to programmaticaly click on page
+* in api we see that page supports a .click() method passing the element we want to click
+* we find the selector with chrome dev tools eleemnts `await page.click('.right a');`
+* once we click we are at google flow. we dont know what is there, we dont control it. whats consisten its the ur (first part of it). page class has a .url() method we can use
+```
+	const url = await page.url();
+	console.log(url)
+```
+
+### Lecture 79 - Asserting URL Domain
+
+* we look into [jest docs](https://jestjs.io/docs) to see how we can assert urls
+* we will use .toMatch() and a simple regex `expect(url).toMatch(/acounts\.google.com/);`
+
+### Lecture 80 - Issues with OAuth
+
+* once we are logged in we get two links on header right. My blogs and Logout
+* we want to test that, a lot of app functionality requires us to be logged in
+* we can write automated test on code maintained by google.
+* we will later use a ci tool to do tests from us. when google detects we are loggin in from an automated machine it blocks attepts
+* testing OAUth from CI tool has potential issues
+	* google detects we log in to our accounts from a new machine
+	* CI tool will hammer google OAuth service (many simultaneous requests)
+	* it will trigger google protection AKA Captcha!
+
+### Lecture 81 - Solving Authentication issues with Automated Testing
+
+* alternative ways to test OAuth
+	* Make a secret route on the server that automatically logs in our Chromium browser: BAD practice to modify our server code to make our test suite work. Security issues
+	* When tests are running, dont require authentication of any kind : Server is running 100% separately from test suite. We cannot easily change the server while we are running tests
+	* Somehow convince our server that the chromium browser is logged into the appby faking a session: We ll try this.
+* google provides a test service but this is a Goolge specific solution
+
+### Lecture 82 - The Google OAuth FLow
+
+* in our main app file *index.js* we setup our express app and add in two suthentication related middlewares: cookieSession and passport
+	* passport handles authentication our app
+	* cookieSession is responsible for maintaining a session of incoming requests
+* in services/passport.js file contains authenticationr elated code: 
+	* user SerDes, 
+	* google strategy config
+	* callback triggered after user comes back from OAuth
+* the Google OAuth flow is
+	* User->Node: User visits /auth/google route
+	* Node->Google: User forwarded to Google
+	* Google->Node: User enters loging, redirected back to /auth/google/callback route
+	* Node->Google: Server asks for more details about the user
+	* Google->Node: Google responds with user profile
+	* Node->User: Server sets cookie on users browser that identifies them
+	* User->Node: All future requests include cookie data that identifies this user
+* Login w/ Google liknk routes to /auth/google
+* Server uses the user profile data to add an entry to its database for user. our server puts info on users cookie
+* the steps we will emulate to fake login will be the last two as we dont want to touch google servers at allx:
+	* Node->User: Server sets cookie on users browser that identifies them
+	* User->Node: All future requests include cookie data that identifies this user
+
+### Lecture 83 - Inner Workings of Sessions
+
+* we start in browser without being logged in
+* we login with OAuth having open the developer tools (network)
+* we see a list of http requests happenning behind the scenes
+* we have requests from google to our app to the /auth/google/callback? exchaning code regarding the user
+* we click on this request and select headers. in response headers there are two set-cookie attribute setting session and session.sig on our browser
+* we need to figure out what data gets stored in cookie to fake it. we ll use reverse engineering to decypher the info contained
+* we cp the hashed data
+* in a node cli we write
+```
+const session = '<hashed session data'
+const Buffer = require('safe-buffer').Buffer;
+Buffer.from(session, 'base64').toString('utf8')
+>> {"passport":{"user":"<userID>"}}
+```
+* our session contains the userid in JSON format as stored in MongoID (not the googleID)
+* the way browser uses the sessioncookies to go to loged in status is: 
+	* Browser->Server: Sends session,session.sig 
+	* In Server: server uses session.sig to ensure session was not touched -> access info in session -> use User ID in session to lookup user in DB -> Does User Exist? yes:the incoming request belongs to that user no:something i wrong. assume user isnt signed
+* cookiesession lib parses the hashed cookie as a JS object as req.session
+* we need to fake a hash and use it to signup for testing purposes
+
+### Lecture 84 - Sessions From Another Angle
+
+* cookie session and passport are middlewares. they stand before the request handler callback when a request comes in
+* cookie-session: pulls properties 'sessio' and 'session.sig' off cookie -> uses 'session.sig' to ensure 'session' wasnt manipulated -> secode 'session' into JS object -> place that obkect on 'req.session' 
+* passport: look at req.session and try to find 'req.session.passport.user'->if an ID is stored there, pass it to 'deserializeUser' -> get back a user and assign it to 'req.user'
+* to fake a user login for testing we will:
+	* create a page instance
+	* take an existing user ID and generate a fake session object with it
+	* sign the session object with keygrip
+	* set the session and signature on our Page instance as cookies
+
+### Lecture 85 - Session Signatures
+
+* our signature is a base64 string containing the user credential
+* without any further protection a malicious user could get the session hash and use it to sign in (fake a user)
+* session signature is a way to see if someone has tampered the data
+* base64 session + Cookie Signing Key = Session Signature (session.sig)
+* cookie signing key is a secret we dont share with anyone (it resides in server)
+* we use the key with session.sig to get back session
+* the cookiekey resides in config/dev.js
+* in prod.js we never expose the key . it comes from an environment param
+* with cookie-session module another module 'cookies' is installed an its dependency 'keygrip'
+* [keygrip](https://www.npmjs.com/package/keygrip) is used in our app to generate and verify the session signature
+* in its doc we see we work with key opbject and its methods
+* to see it in action we cp again ther session key from browser devtools and open an node cli
+```
+const session = '<sessionkey>'
+const Keygrip = require('keygrip')
+const keygrip = new Keygrip(['123123123']) # we pass in our dev cookiekey
+keygrip.sign('session='+session)
+>> we get the session signature, it matches our original one (we use same key)
+keygrip.verify('session='+session, '<session.signature>')
+>> true
+```
+
+### Lecture 86 - Generating Sessions and Signatures
+
+* 

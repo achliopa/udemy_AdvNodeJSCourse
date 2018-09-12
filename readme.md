@@ -1459,4 +1459,52 @@ keygrip.verify('session='+session, '<session.signature>')
 
 ### Lecture 86 - Generating Sessions and Signatures
 
+* we add a new test for oath login
+* we ll attempt to sign in and assert that we see the logout link
+* we need to take an existing user ID and generate a fake session object with it.
+* we get our userid from mlab DB (users collection) and set it as const `const id = '5b8d17ced87da20fd8cba5c9';`
+* we use Buffer to make our madeup sessionObject to a hash (stringified)
+```
+const Buffer = require('safe-buffer').Buffer;
+	const sessionObject = {
+		passport: {
+			user: id
+		}
+	};
+	const sessionString = Buffer.from(JSON.stringify(sessionObject)).toString('base64');
+```
+* we will use keygrip to create the signature
+```
+	const Keygrip = require('keygrip');
+	const keys = require('../config/keys');
+	const keygrip = new Keygrip([keys.cookieKey]);
+	const sig = keygrip.sign('session=',sessionString);
+```
+
+### Lecture 87 - Assembling the Pieces
+
+* we ll now combine session and sig into a cookie and send it to the browser which will use it to login
+* in puppeteer docs there is a .setCookie() method in page class. we will use it
+* if we dont set the domain in the cookie we need to call the method while being in the app
+* we need to pass the cookie name. we can find it in chrome devtools => apps => cookies if we have already used the app before. 
+```
+	await page.setCookie({ name: 'session', value: sessionString });
+	await page.setCookie({ name: 'session.sig', value: sig });
+```
+* we programatically refresh the page to simulate visiting the app while being loged in `await page.goto('localhost:3000');`
+* we test using `test.only()` to run only this test
+
+### Lecture 88  - WaitFor Statements
+
+* we ll now test that we see the logout link after login. we ll use dom selecto and assertion form jest
+* we select the a tag using the href
+```
+	const text = await page.$eval('a[href="/auth/logout"]', el => el.innerHTML);
+	expect(text).toEqual('Logout');
+```
+* our test fails . it does not fing the a tag. we need to watit the page to render
+* we ll use puppeterr page.waitFor() method `	await page.waitFor('a[href="/auth/logout"]');` before we greab the element for testing
+
+### Lecture 89 - Factory Functions
+
 * 

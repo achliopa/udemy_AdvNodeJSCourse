@@ -1564,3 +1564,21 @@ const user = await userFactory();
 const { session, sig } = sessionFactory(user);
 ```
 * we run our test and then think how to refactor also cookie setting to remove it from test
+
+### Lecture 95 - Adding a Login Method
+
+* one way to decouple code is to add a new method to page instance to put there all the login code
+* all the setup actions have todo with page instance
+* we  could put all this code to a page class method called login and call it on an instance like `page.login()`
+* in cache.js we extended an already existing method of mongoose Query class
+* to extend the page class we go to puppeteer docs to s ee its source code
+* to extend teh page we could write
+```
+const Page = require('puppeteer/lib/Page')
+Page.prototype.login = async function() {
+	// our login code from testfile
+}
+```
+* we ll use a more elegant solution
+
+### Lecture 96 - Extending Page

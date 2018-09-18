@@ -1216,8 +1216,7 @@ clearhash(hashKey) {
 * we import the method in blogroutes
 * we will use this clear out when we create new blogs (post request in routes)
 * we add `clearHash(req.user.id)` after the try catch statement
-* we test
-learHash } = require('../services/cache')`
+* we test `{ clearHash } = require('../services/cache')`
 * we export our method using middleware rules
 * our middleware will run before the route handler but we dont want to delete the cache before we event attempt to create the post. we dont want that
 * express does not allow us to add middleware after the route handler (we would have to call next() in the handler)
@@ -1226,10 +1225,10 @@ learHash } = require('../services/cache')`
 ```
 module.exports = async (req,res,next) => {
 	await next();
-
 	clearHash(req.user.id);
 }
 ```
+
 * we import the middleware export in blogroutes and add it in the post route after login
 
 ## Section 5 - Automated Headless Browser Testing
@@ -1507,4 +1506,61 @@ const Buffer = require('safe-buffer').Buffer;
 
 ### Lecture 89 - Factory Functions
 
-* 
+* we want to refactor taking out our signup logic from the test method (we will reuse it)
+* beforeEach cannot do the job because it runs only for the tests in the file its is located
+* we will use a factory function located in a separate file.
+* factory is a function used to generate test data. they use the factory pattern (assemble data and return ASAP)
+* well use 2 functions: 
+	* Session Factory: session string and signature
+	* User Factory: we do not want to use same user for all our tests. we want brand new user for every test (create user and save it to mongoDB)
+
+### Lecture 90 - Session Factory
+
+* in test folder we make a new folder called factories
+* we add a file *sessioNFactory.js* and export an anonymous function
+* we gut out session creation code from our last test to this method (we move imports outside the export)
+* we return the session and sig as an object
+* we add the user model instance as an input param in the export method
+* we will create the user with UserFactory and pass it in. to use its id we use `user._id.toString()` as *user._id* is an object which we cannot stringify to get id (we stringify the object)
+
+### Lecture 91 - Assembling the Session Factory
+
+* we need to wire back the factory to our test method
+* we import the factory file  `const sessionFactory = require('./factories/sessionFactory');`
+* we extract session and sig from rerutrned obj `	const { session, sig } = sessionFactory();` we need to pass in a user object from User Factory
+* we reomve id var as we will userFactory to create it
+
+### Lecture 92 - Code Separation
+
+* in factories folder we make a new file called *userFactory.js*
+* in it we import mongoose `const mongoose = require('mongoose');`
+* we import User model `const User = mongoose.model('User');`
+* we export an anonymous method
+* in it we use the model to create a new user `return new User({}).save();`
+* we check in model folder the User.js schema for the params we need to pass in (googleId, displayName). we dont use these two props in our app so we dont need to fake them
+* if we run tests we ll get an error (model unknown). this is because jJEST runs a new node process. Jest runs only test files
+* if we need anything from the app in our test we need to require it in (connection to mongo db) we grab this code from index.js and the User.js schema
+
+### Lecture 93 - Global JEST Setup
+
+* we ll add one file to do all JEST (testing setup) and load it before any test
+* we add the file in test folder and name it setup.js
+* we import the schema `require('../models/User');`
+* we require in mongoose  and key file and add in mongodb setup code from index
+* we add a jest script in package.json for the setup to execute before tests
+```
+  "jest": {
+    "setupTestFrameworkScriptFile": "./tests/setup.js"
+  },
+```
+
+### Lecture 94 - Testing Factory Tests
+
+* we require the Userfactory in our tests `const userFactory = require('./factories/userFactory');`
+* in our login test we need to create a user and passit in the session favcotory
+* mongoose operations are async (return a promise)
+```
+const user = await userFactory();
+const { session, sig } = sessionFactory(user);
+```
+* we run our test and then think how to refactor also cookie setting to remove it from test

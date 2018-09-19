@@ -1582,3 +1582,69 @@ Page.prototype.login = async function() {
 * we ll use a more elegant solution
 
 ### Lecture 96 - Extending Page
+
+* we use [codepen](codepen.io) to test some ideas
+* our test js code is
+	* we create adummy class and add functionality to it (using extends keyword from ES2015)
+	* we can extend a puppeteer class but how we will instruct the lib to use it? PROBLEM
+```
+console.clear();
+class Page {
+	goto() {
+		console.log('I am going to another page');
+	}
+	setCookie() {
+		console.log('I am setting a cookie');
+	}
+}
+
+class CustomPage extends Page {
+	login() {
+		console.log('All our login logic');
+	}
+}
+```
+* we test another idea. instead of extending we wrap the class in another class
+```
+console.clear();
+class Page {
+	goto() { console.log('I am going to another page'); }
+	setCookie() { console.log('I am setting a cookie'); }
+}
+
+class CustomPage {
+	constructor(page) {
+		this.page = page;
+	}
+
+	login() {
+		this.page.goto('localhost:3000')
+		this.page.setCookie();
+	}
+}
+```
+* we write some pseudocode to feel how it is to use this approach
+```
+// const page = browser.launch();
+const page = new Page();
+const customPage = new CustomPage(page);
+customPage.login();
+// to interact with underlying page
+customPage.page.goto();
+```
+* we make heavy use of namespace and this is awkward
+
+### Lecture 97 - Introduction to Proxies
+
+* we dont want to need to write customPage.page
+* a nobrainer is to overload Page methods in CustomPage
+```
+goto() {
+	this.page.goto()
+}
+```
+* JS offers an advanced feat called Proxy
+* say we have a projket whwere we need a Greeting class. it has two methods english() and spanish() to return a string in each lang. Greeting is implemented in a lib. we dont want to change the class.
+* say in our project we need greetings in more languages . german() and french(). or only  way is to add another class MoreGreetings
+* we would like to have a single object for all methods
+* Proxy is a feat of JS ES2015. Proxy allows access to multiple classes

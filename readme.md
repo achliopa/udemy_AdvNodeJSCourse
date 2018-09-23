@@ -1594,4 +1594,87 @@ goto() {
 * say we have a projket whwere we need a Greeting class. it has two methods english() and spanish() to return a string in each lang. Greeting is implemented in a lib. we dont want to change the class.
 * say in our project we need greetings in more languages . german() and french(). or only  way is to add another class MoreGreetings
 * we would like to have a single object for all methods
-* Proxy is a feat of JS ES2015. Proxy allows access to multiple classes
+* Proxy is a feat of JS ES2015. Proxy allows access to multiple classes (target objects)
+* proxy decides which object to call depending on the method
+
+### Lecture 98 - Proxies In Action
+
+* we simulate Greetings and MoreGreetings class in node cli
+* Proxy() is a function constructor included with ES2015. 
+	* it takes two arguments: the target (object we want to access), the handler (an object with a set of functions). these functions are executed anytime we attempt to access the target object
+	* the Proxy handler has a key assigned to it called get. it is a function taking two arguments. *target* which is identical to the proxy handler and *property*. to see what it is we console log it. we call the handler using the function name `allGreetings.french`. the property is the function name. so the method we try to call is passed in as property in the get method
+	* get can refer to properties not only methods
+	* property doestnt check if the property we ttry to get exists!!!!
+	* in our example: target is moreGreetings, property is the method
+* if instead of cl the propery we reference it we see that the consolo log is the method it self. so return target[property] in the get returns the method. we hust have to call it with `allGreetings.german()` to get 'Hallo'
+
+
+```
+console.clear()
+
+class Greetings {
+	english() { return 'Hello';}
+	spanish() { return 'Hola';}
+}
+class MoreGreetings {
+	german() { return 'Hallo';}
+	french() { return 'Bonjour';}
+}
+const greetings = new Greetings();
+const moreGreetings = new MoreGreetings();
+
+const allGreetings = new Proxy(moreGreetings, {
+	get: function(target, property) {
+		// console.log(property)
+		return target[property]
+	}
+});
+```
+* we can reference multiple objects (thats the purpose of proxy with) with a hack (I DONT LIKE IT. ITS BAD BAD BAD) `return target[property] || greetings[property]` with this additin if we call `allGreetings.english()` we get back 'Hello'
+* we will impelement a proxy that governs access to Page and CustomPage classes
+
+### Lecture 99 - Combining Object Property Access
+
+* again in node cli we test proxy on page object
+* we dont have to reference page as a separate object in our getter conditional logic but the page passed in the customPage
+```
+// custom page login
+login() {
+	this.page.goto('localhost:3000');
+	this.page.setCookie();
+}
+
+const page = new Page();
+const customPage = new CustomPage(page);
+
+const superPage = new Proxy(customPage, {
+	get: function(target, property) {
+		return target[property] || page[property];
+	} 
+});
+
+superPage.goto();
+superPage.setCookie();
+superPage.login();
+```
+
+* in all our tests we will always need the page proxy to setup tests
+* we can rwrap the proxy code in a method and call it to setup
+```
+const buildPage() {
+	const page = new Page();
+	const customPage = new CustomPage(page);
+	const superPage = new Proxy(customPage, {
+	get: function(target, property) {
+			return target[property] || page[property];
+		} 
+	});
+	return superPage;
+}
+```
+* we can use the method in our beforeEach
+* a better pattern is to add it as a static method to CustomPage class. so we can call it without creating an instance and have proxy available for use `const superPage = CustomPage.build()`
+
+### Lecture 100 - Combining the Page and Browser
+
+* 

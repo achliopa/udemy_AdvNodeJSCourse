@@ -1159,7 +1159,9 @@ clearhash(hashKey) {
 
 * we ll refactor using express js middleware system
 * in the middlewares folder we add a new file *cleanCache.js*
-* we require in the cleaHash method `const { c```
+* we require in the cleaHash method 
+* we add it as prototype method
+```
 mongoose.Query.prototype.cache = function() {
 	this.useCache = true;
 	return this;

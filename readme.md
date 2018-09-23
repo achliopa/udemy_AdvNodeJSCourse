@@ -1677,4 +1677,55 @@ const buildPage() {
 
 ### Lecture 100 - Combining the Page and Browser
 
+* in test we add a directory called helpers, and add a page.js file
+* in there we import puppeteer and create a CustomPage class (not to confuse it with puppeteer page)
+* in the class we add a static method called build (we have it) to create a page and make our proxy.
+* to use default page from puppeteer we need browser
+* we write our implementation
+
+```
+const puppeteer = require('puppeteer');
+
+class CustomPage { 
+	static async build() {
+		const browser = await puppeteer.launch({
+			headless: false 
+		});
+
+		const page = await browser.newPage();
+		const customPage = new CustomPage(page);
+
+		return new Proxy(customPage, {
+			get: function(target, property) {
+					return target[property] || page[property] || browser[property];
+				} 
+			});
+
+	}
+
+	constructor(page) {
+		this.page = page;
+	}
+}
+
+module.exports = CustomPage;
+
+```
+* we add browser in our proxy. as all we use the browser obj is to launch the page and close it when finish.. weuse our customPage as a wrapper for all
+
+### Lecture 101 - Custom Page Implementation
+
+* we import our new CustomPage as PAge in the helper.test.js file `const Page = require('./helpers/page');`
+* this Page wraps all puppeteer logic so we remove pupeteer import and browser var. our beforeEach becomes. afterEach also changes
+```
+beforeEach(async () => {
+	page = await Page.build();
+	await page.goto('localhost:3000');
+});
+```
+
+* we run our test. tests pass but browser does not close
+
+### Lecture 102 - Function Lookup Priority
+
 * 

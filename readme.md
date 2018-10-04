@@ -1728,4 +1728,45 @@ beforeEach(async () => {
 
 ### Lecture 102 - Function Lookup Priority
 
+* the problem of not closing browser after test has to do with our custom page class and the order with which we look for methods in the proxy included classes.
+* page and browser have a .close() method. so a s we look for page methods first it runs first closing the tab but not the browser
+* one solution in to add the browser in the constructor and define a sustom page close method which calls the browser close() method
+* the other way is to swap order of page and browser property giving browser higher priority `return target[property] || browser[property] || page[property]; `
+* tests return closing the browser
+
+### Lecture 103 - Gee, I hope this works
+
+* we are ready to move our auth logic to our custompage implementation
+* we cut the auth logic from header test method and move it to a new method in custom page class
+* we move the factory imports , replace page object ref to this.page and make the new method *login()* an async
+* in our authentication test in test file we call the method `await page.login()` before the assertion
+* so custom page encapsulates all logic..
+
+### Lecture 104 - Reusable Functions on Page
+
+* we ll try to write a better interface to pull content out of the page
+* currently we goto custom page for puppeteer page class to use its $eval method to extract html content
+* we  wrap the cryptic $eval method in a getContent() method of custoPage class
+```
+async getContentsOf(selector) {
+	return this.page.$eval(selector, el => el.innerHTML);
+}
+```
+
+### Lecture 105 - Testing Blog Creation
+
+* we are done with custom page implementation so we can continue writing our tests.
+* we will test the complete flow of creating a new blog. login with Oauth => goto myblogs => click + button => see the form
+* we use the typical puppeteer flow: launch chromium => navigate to app => click stuff on screen => use the dom selector to retrieve the content => assert
+* our specific test implementation flow: launch chromium => navigatet o app and login => got to blogs route and click + => use a DOM selector to retrieve conent => assert content
+* we create a new test file to test the page *blogs.test.js*
+* our imports and setup code are same as header test
+
+### Lecture 106 - Default Navigation
+
+* we write our fist test usin the page.login() method. but instead of normal flow our custom login() for tewsting does not redirect to /blogs route
+* we can either modify login() or add `await page.goto('/localhost:3000/blogs')` in test. we choose DRY and first method
+
+### Lecture 107 - Asserting Form Display
+
 * 

@@ -13,7 +13,14 @@ afterEach(async () => {
 	await page.close();
 });
 
-test('when logged in, can see create form', async () => {
-	await page.login();
+describe('while logged in', async () => {
+	beforeEach(async () => {
+		await page.login();
+		await page.click('a.btn-floating');
+	});
 
+	test('can see create form', async () => {
+		const label = await page.getContentsOf('form label');
+		expect(label).toEqual('Blog Title');
+	});
 });

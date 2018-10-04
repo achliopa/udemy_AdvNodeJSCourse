@@ -1769,4 +1769,44 @@ async getContentsOf(selector) {
 
 ### Lecture 107 - Asserting Form Display
 
-* 
+* we implement our test
+```
+	await page.login();
+	await page.click('a.btn-floating');
+	const label = await page.getContentsOf('form label');
+	expect(label).toEqual('Blog Title');
+```
+* we run two tests in parallel (two files) using jest
+* tests fail if they need more than 5sec
+
+### Lecture 108 - Test Timeout
+
+* 5secs are not enough for our tests. we will change the jest setup
+* we add `jest.setTimeout(30000);` in setup.js where we setup jest
+
+### Lecture 109 - Common Test Setup
+
+* there are many options of testing functionality. they can be modeled in a tree like struct
+* we should test for worst case scenarios as well
+* many tests have common test setup. we should reuse it
+
+### Lecture 110 - Nested Describes for Structure
+
+* we will add a test element. the describe statement
+* describe is used to group together groups of similar tests that share common setup
+* describe can contain other descibe statements or tests
+* describe is a global jest method
+* our test refactored is 
+```
+describe('while logged in', async () => {
+	beforeEach(async () => {
+		await page.login();
+		await page.click('a.btn-floating');
+	});
+
+	test('can see create form', async () => {
+		const label = await page.getContentsOf('form label');
+		expect(label).toEqual('Blog Title');
+	});
+});
+```

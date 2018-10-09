@@ -1810,3 +1810,196 @@ describe('while logged in', async () => {
 	});
 });
 ```
+
+### Lecture 111 - Asserting validation Errors
+
+* we will use a nested describe stateemnt for this test
+* we will add a describe statement "when using invalid inputs"
+* we will test for "submitting shows error messages"
+* in the describe we setup the test (erroneous form data or empty) in beforeEach
+```
+describe('and using invalid inputs, ', async () => {
+		beforeEach(async () => {
+			await page.click('form button');
+		});
+		test('the form shows an error message', async () => {
+			const titleError = await page.getContentsOf('.title .red-text');
+			const contentError = await page.getContentsOf('.content .red-text');
+
+			expect(titleError).toEqual('You must provide a value');
+			expect(contentError).toEqual('You must provide a value');
+		});
+	});
+```
+
+### Lecture 112 - Asserting Form Confirmation
+
+* we test for valid form flow adding a new describe
+* we need to be able to add content using puppeteer. we use `page.type(<selector>,<what to add>)` `await page.type('.title input', 'My Blog Title');`
+
+### Lecture 113 - Asserting Blog Creation 
+
+* we get a selector for save button "button.green"
+* we find a selector for last post. in every test we make a new user and a first post so we should see a post on list. not care on order
+* our test involves backend request and this means wait time. we needa waitFor statement like in custom page. we put in an element of the new page route
+```
+	describe('and using valid inputs, ', async () => {
+		beforeEach(async () => {
+			await page.type('.title input', 'My Blog Title');
+			await page.type('.content input', 'My Blog Content');
+			await page.click('form button');
+		});
+		test('submitting takes user to review screen', async () => {
+			const text = await page.getContentsOf('h5');
+			expect(text).toEqual('Please confirm your entries');
+		});
+
+		test('submitting then saving adds blog to index page', async () => {
+			await page.click('button.green');
+			await page.waitFor('.card');
+
+			const title = page.getContentsOf('.card-title');
+			const content = page.getContentsOf('p');
+
+			expect(title).toEqual('My Blog Title');
+			expect(content).toEqual('My Blog Content');
+		});
+	});
+```
+
+### Lecture 114 - Testing Prohibited Actions
+
+* when not signed in we should not be able to create or view posts
+* if not signed in there are no elements to use for our assertions => null exceptions
+* we go to api level interaction to test (make blogpost call)
+* we should not be able to view the form page. react code is not final so we can but api has restrivctions
+* options avaialble: direct api request from jest, write code to be executed iside the chromium  browser
+
+### Lecture 115 - Direct API Requests
+
+* our test flow that will run in Chromium is: 
+	* go to localhost:3000 without logging in
+	* create a POST request that tries to create a blog post
+	* assert that the request results in an error
+* we ll create a new chromium instance
+* we test api calls from our browser in a route set in /routes
+* in browser console we want to write an ajax request with axios. axios is not standard in chromium. fetch api is included
+* we formulate our fetch api post request following fetch API rules
+* credentials refers to the cookies we want to pass. 'same-origin' pasess all
+```
+fetch('/api/blogs', {
+		method: 'POST',
+		credentials: 'same-origin',
+		headers: {
+			'Content-Type': 'application/json'
+		},
+		body: JSON.stringify({ title: 'My Title', content: 'My Content'})
+	});
+```
+* this req if logged in should create a post
+* if we are not loggied in we get a n error in console
+
+### Lecture 116 - Executed Arbitrary JS in Chromium
+
+* our test will assert for an error object in the reply
+* puppeteer page class has evaluate() method to test a JS method in chromium
+* we need to pass in evaluate a function that wraps the code
+* the results of the method will be returned to us
+* the method can return a promise. chromium will wait for the promise to resolve and get our result back
+
+### Lecture 117 - Asserting Page Response
+
+* we make a new describe block and add the test
+* when fetch returns a response to the browser, it streams it off a s raw data
+* we need to take raw data convert them to JSOn and then retirnm them to evaluate them `then(res => res.json())`
+* we get the result resturned from page.evaluate() making it await method
+```
+describe('user is not logged in, ', async () => {
+	test('User cannot create blog posts', async () => {
+		const result = await page.evaluate(()=> {
+			return fetch('/api/blogs', {
+				method: 'POST',
+				credentials: 'same-origin',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({ title: 'My Title', content: 'My Content'})
+			}).then(res => res.json());
+		});
+
+		expect(result).toEqual({error: 'You must log in!'});
+	});
+});
+```
+
+### Lecture 118 - Get Restrictions
+
+* we need to make sure that we cannot view posts.
+* we will do with fetch using the get request.
+```
+() = > {
+	fetch('/api/blogs', {
+		method: 'GET',
+		credentials: 'same-origin',
+		headers: {
+			'Content-Type': 'application/json'
+		}
+	});
+}
+```
+* we execute it in browser console. if we are logged in or not. it works
+* we could try postman instead
+
+### Lecture 119 - A final 'GET' test
+
+* we follow the similar pattern for the test
+```
+	test('User cannot get a list of posts', async () => {
+		const return = await page.evaluate(() => {
+			return fetch('/api/blogs', {
+				method: 'GET',
+				credentials: 'same-origin',
+				headers: {
+					'Content-Type': 'application/json'
+				}
+			}).then(res => res.json());
+		});
+
+		expect(result).toEqual({error: 'You must log in!'});
+	});
+```
+
+### Lecture 120 - Super Advanced Test Helpers
+
+* in this lecture a number of optional refactors to simplify test code
+
+## Section 6 - Wiring Up Continuous Integration
+
+### Lecture 121 - Introduction to CI
+
+* a typical project flow is: 
+	* project repo in github
+	* project cloned local to pc codebase
+	* work on project locally
+	* commit changes to github repo
+* the process of merging our code changes to a single brach is CI(continuous integration)
+* A CI Server runs automatic checks (tests) on the codebase to ensure the changes havent broken anything
+* we will setup a CI server to practice CI
+* a typical CI flow:
+	* developer pushes code to github
+	* CI server detects that a new push of code has occured
+	* CI server clones project to a cloud based VM
+	* CI Server runs the tests (test suite eg. mocha)
+	* If all tests pass, CI marks build as 'passing' and does some followup: send email, auto deploy, notification on github etc...
+
+### Lecture 122 - CI Providers
+
+* to setup CI we need: github accound, basic git knowledge, a lot of configuration
+* CI providers: Travis CI, Jenkins CI, Circle CI, Codeship, AWS Codebuild
+* Travis CI is similar to Circle CI
+* The flow we will implement will be:
+	* push code to gihub
+	* travis automatically detects pushed code
+	* travis clones our project
+	* travis run tests using a "travis.yml" file
+	* if tests are ok. travis sends us an email

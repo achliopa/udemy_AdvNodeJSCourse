@@ -2003,3 +2003,50 @@ describe('user is not logged in, ', async () => {
 	* travis clones our project
 	* travis run tests using a "travis.yml" file
 	* if tests are ok. travis sends us an email
+
+### Lecture 123 - THe basics of YAML files
+
+* yaml is simplified JSON a RoR era JSON
+* there are auto converters YAML <-> JSON e.g [codebeautify](https://codebeautify.org)
+YAML `color: 'red'` translates to JSON `{ "color": "red"}`
+* tab indentation in YAML is like nesting objects in JSON
+```
+languages:
+	english: 'excellent',
+	spanish: 'excellent'
+```
+* array definition in YAML (tab and dash)
+```
+countToFive:
+	- 'one'
+	- 'two'
+	- 'three'
+	- 4
+```
+
+### Lecture 124 - Travis YAML Setup
+
+* official [travis doc](docs.travis-ci.com)
+* file name ".travis.yml"
+* in YAML file
+	* set language: `language: node_js`
+	* node js version to use:
+	```
+	node_js:
+		- "8"
+	```
+	* what OS distro to use: `dist: trusty`
+	* we specify services we want for our project: 
+	```
+	services:
+		- mongodb
+		- redis-server
+	```
+	* set project environment variables:
+	```
+	env:
+		- NODE_ENV=ci
+	```
+* we will add a ci.js in /config to setup env params for ci env
+
+### Lecture 125 - More Travis YAML

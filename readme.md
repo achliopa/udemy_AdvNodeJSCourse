@@ -2050,3 +2050,114 @@ countToFive:
 * we will add a ci.js in /config to setup env params for ci env
 
 ### Lecture 125 - More Travis YAML
+
+* we add more config options in YAML config file
+* travis will clone our project from github
+* when we push node code to github we ignore node modules. everytime travis clones the project it has to install these dependencies to run tests. this takes a lot of time
+* we can tell travis to cache the folder in server for futute (re)use
+* if there are changes no worries npm install will run anyway
+* we specify the folders we want to cache. for front-end and backend
+```
+cache:
+  directories:
+    - node_modules
+    - client/node_modules
+```
+* we specify install config to tell travis how to prepare the service from source files running for testing. a bunch of commands
+```
+install:
+  - npm install
+```
+
+### Lecture 126 - Client Builds
+
+* we add project specific config in YAML ` - npm run build` in install config
+* in dev mode we have our express API (backend) in port 5000 and React Server (frontend) in port 3000. so 2 runtimes
+* in prod mode we have the express API in port 3000 and built reactJS files integrated
+* build script in package.json runs:
+	* npm install in client
+	* npm run build in client "react-scripts build" put bundles in build folder
+* ci enviroment behaves like prod env mode
+
+### Lecture 127 - Script Config
+
+* we add a script section in YAML to start server and run tests
+```
+script:
+  - nohup npm run start & 
+```
+* nohup: if the shell is closed, dont kill anything this command creates (nohangup)
+* npm run start: run the server (THE command)
+* &: run this command in a subshell (in the background)
+* we can kill the server with `pkill node` even in backfground
+* we give some time for server to start before we start tests (3sec) `- sleep 3`
+* start test suite `- npm run test`
+
+### Lecture 128 - Using Travis Documentation
+
+* we need to modify our codebase so that CI can run and test.
+* in dev mode mongoDB runs remotely on MLab while redis and express api run locally
+* in ci mode all 3 run on CI server
+* travis docs give info on how to setup mongodb and redis in ci server
+* mongodb runs on default port on localhost same for redis (6379)
+
+### Lecture 129 - More Server Configuration
+
+* server config flow:
+	* add ci.js file
+	* fix redis URL in services/cache.js
+	* add redis URL to dev.js and ci.js
+	* add mongoDB URI to ci.js
+	* make sure server starts on port 300 in CI mode
+	* make sure server serves react client files in CI mode
+* trial and test process
+* in config dir we add ci.js
+* cp all contents from dev.js to ci.js
+* for googlekeys we can create a new google project for OAuth to use only in CI tests if we want. not necessary for our case
+* mongoURI we need to replace as monmgo will run locally
+* in our cache.js we expose directly the redis URL. we will move it to config keys file(s)
+* we replace the explicit redisURL const assiggnemet with
+```
+const keys = require('../config/keys');
+const client = redis.createClient(keys.redisUrl);
+```
+* we add `redisUrl: 'redis://127.0.0.1:6379'` to ci.js and dev.js
+* we mod momgodb param in ci.js to `mongoURI: 'mongodb://127.0.0.1:27017/blog_ci',`
+* mongo if does not find db it creates it
+* in root project dir in index.js and see where app port is defined. we can setit with process.env.PORT. we set it in .travis.yml in env: section adding `-PORT=3000`. IMPORTANT NOTE! "Adding in two records in env: causes two separate builds to be created, where one build has the NODE_ENV set, and the other has PORT set."
+* put all environmental params in one entry!!!!!!!!!!!!!!!!!!!!!!!!
+```
+env:
+  - NODE_ENV=ci PORT=3000
+```
+* in dev react files are served by react server. in ci and prod we want to serve them from express APi as a bundle. 
+* in index.js this is set with code
+```
+if (['production'].includes(process.env.NODE_ENV)) {
+  app.use(express.static('client/build'));
+
+  const path = require('path');
+  app.get('*', (req, res) => {
+    res.sendFile(path.resolve('client', 'build', 'index.html'));
+  });
+}
+```
+* so all files are served from built dir as static. we add an entry for ci `if (['production','ci'].includes(process.env.NODE_ENV)) {`
+
+### Lecture 131 - A Touch More Configuration
+
+* in custom page.js we open a chromium instance with puppeteer. in dev mode we se headless: false so we require the physical browser to lanunch. in CI we dont need it. VMs typically have only a console. to speed up our tests we set no-sanbox arg. so our pupetter browser config becomes
+```
+		const browser = await puppeteer.launch({
+			headless: true,
+			args: ['--no-sandbox']
+		});
+```
+* in travis server we need to put http:// in front of any harcoded link URL
+
+### Lecture 132 - Git Repo Setup
+
+* our config is done.
+* we need a project repo on github (not a course)
+* we make the repo on github NodeCI
+* if we have cloned the local repo from github. git still keeps as origin the original repo we need to replace it with the new one

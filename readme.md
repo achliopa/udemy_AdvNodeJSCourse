@@ -2161,3 +2161,54 @@ if (['production'].includes(process.env.NODE_ENV)) {
 * we need a project repo on github (not a course)
 * we make the repo on github NodeCI
 * if we have cloned the local repo from github. git still keeps as origin the original repo we need to replace it with the new one
+
+### Lecture 133 - Travis CI Setup
+
+* we need to tell travis to watch for our github repo
+* we go to [travis](https://travis-ci.org/) and signin
+* we login to our personal dashboard
+* we have not synced any repo with travis. we enable NodeCI repo in our dashboard
+* our repo appears in left list but there are no builds
+
+### Lecture 134 - Triggering CI Builds
+
+* we ll commit our code to local repo and push to github (NodeCI). this should trigger a build on Travis
+* note that sensible data like google client id and mongodb credentials are passed in github (public)
+* we make our repo private 
+* travis builds and runs tests (pass)
+
+### Lecture 135 - Build Success
+
+* build passes and travis sends us an email to notify the build success
+
+## Section 7 - Scalable File/Image Upload
+
+### Lecture 136 - Image Upload
+
+* we want to upload images for our blog posts and view them when user sees the post
+* we need to add image upload int he clientside of our app
+* in review screen we need to add a image attach button to trigger fs select file
+* then on blog view we should see the image
+
+### Lecture 137 - Big Issues around Image Upload
+
+* Big Image Upload Issues
+	* Where do images get physically stored?
+	* How do images *get* to the place they should be stored?
+	* How do we relate images to a particular blog post?
+* image storage flow: browser -> express API ->
+	* option 1: -> mongoDB. easy and clear. iage doc embedded in blog document model. BAD beacuse we pay per GB of sorage we use on server. and images consume GBs FAST
+
+### Lecture 138 - Alternate Image Upload
+
+	* option 2 (in HD attached to Server: image -> [Our hosted Server[Express API][HDD]] HDD is an 1:1 mapping to our Express Server. if we have multiple machines on Cloud to scale our server say a load balancer and 2 servers w/ HDD the solution does not work well with horizontal scaling
+
+### Lecture 139 - Chosen Storage Solution
+
+	* option 3 (outside cloud datastore): IMAGE -> express API -> Amazon S3 || Azure FS || Google Cloud Storage 
+* Amzaon s3 has massive storage and multiple HDDs
+* Amazon S3 costs 0.023$/GB per month. Easy to backup never worry about scaling
+
+### Lecture 140 - Upload Constrains
+
+* 

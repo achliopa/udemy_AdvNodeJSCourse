@@ -2269,4 +2269,72 @@ if (['production'].includes(process.env.NODE_ENV)) {
 
 ### Lecture 146 - Handling File Changes
 
+* we add a variable in the react component to store the file the users selects
+* we ad it to the component state `  state = { file: null};`
+* we add an event handler to input to get the file from selector `onChange={this.onFileChange.bind(this)}`
+* we implement the method and cl the file
+```
+  onFileChange(event) {
+    this.setState( {file: event.target.files} );
+    console.log(event.target.files);
+  }
+```
+* files is a filelist of the selected files
+* file object contains path and type of file
+
+### Lecture 147 - Recording Image Files
+
+* in our file selector we can select only one file. but is event object we have a file list
+* we store the first list element in the state ` this.setState( {file: event.target.files[0]} );`
+* when we click save blog this is when we want to get the presigned URL from AWS S3 for file storage
+* this happens in onSUbmit handler in submitBlog() method. we add the file from state as argument
+* submitBlog() implementation resides in client/src/actions/index.js and is a simple axios api call
+
+### Lecture 148 - The SubmitBlog function
+
+* we ll modify the submitBlog mehtod. what it  does by default is
+	* issue POST request to backend express API to create a blog post
+	* navigate the user back to the list of blogs
+	* tell the Redux side of app about the new blog post that was created
+* our modification is to add 2 steps before the default ones.
+	* issue GET request to backend express API to request from S3 a  presigned URL
+	* use the presigned URL that gets returned to upload the file to AWS S3
+
+### Lecture 149 - AWS Credentials with IAM
+
+* we will now implement the file upload flow
+* we need to create an Amazon WS S3 bucket
+* after we create it we need to create user credentials to get access to the bucket
+* we need to manage the API keys securely. DO NOT COMMIT THE API KEYS TO GITHUB
+* if they steal our keys and try to exploit us we need to protect ourselves. we will use AWS IAM for  this (Identoty and Access Management). we will use it to create limited access user credentials for accessing the bucket. these credentials will work only with this S3 bucket
+
+### Lecture 150 - Creating S3 Buckets
+
+* we login to AWS console. we select S3 and go to S3 dashboard
+
+* we create a new one. give it a new unique name. select a region,next-next and set permissions to this bucket. we keep default (only us) and create it
+
+### Lecture 151 - Allowing actions with IAM policies
+
+* we search for IAM in aws console. we open it
+* In AWS IAM we have 2 main record types
+	* Policy: policies describe what something can do
+	* User: users get assigned policies
+* in IAM console we create a policy we use the visual editor. 
+	* we select a service => s3
+	* action (what to do) => all s3 actions
+	* resources (where) => specific, add ARN (bucket identofier) and put bucket name. add obkject ARN and put the bucket name there as well an in object we click any `arn:aws:s3:::agileng-blog-bucket/*`
+	* we click review policy  and give it a name and create it
+	* our policy appears in the list
+
+### Lecture 152 - Create IAM Users
+
+* our user will be our api
+* in iam dashboard we click users => add user => name it. we choose programmatic access and clock next
+* in permissions we click attach existing policies direclty => look for our custom policy => select it and then click review
+* we create the user and view the keys. WE SHOULD NEVER MAKE SECRET KEY PUBLIC
+* we will add the public key to our dev.js file as accessKeyId and the secretAccessKey so we need to remove dev.js from github add it to .gitignore
+
+### Lecture 153 - Upload Routes Files
+
 * 

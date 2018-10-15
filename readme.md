@@ -2337,4 +2337,52 @@ if (['production'].includes(process.env.NODE_ENV)) {
 
 ### Lecture 153 - Upload Routes Files
 
-* 
+* we will now install the aws sdk to assist us prepare the presigned url `npm install --save aws-sdk`
+* we should create a new route in our app that users can hit to get the presigned url
+* we add anew route file uploadRoutes.js
+* we export the routes in express app 
+```
+module.exports = app => {
+	
+};
+```
+* we import the file in index.js `require('./routes/uploadRoutes')(app);` immediately invoking it
+* we add a new route
+```
+	app.get('/api/upload', (req,res)=>{
+
+	});
+```
+
+### Lecture 154 - Configuring the AWS SDK
+
+* we ll iport the aws-sdk module initialize it with the keys and use it to get the URL
+* we import 
+```
+const AWS = require('aws-sdk');
+const keys = require('../config/keys');
+```
+* we initialize S3
+```
+const S3 = new AWS.S3({
+	accessKeyId: keys.accessKeyId,
+	secretAccessKey: keys.secretAccessKey
+});
+```
+
+### Lecture 155 - GetSignedURL arguments
+
+* we look at [docs](https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html) and look for getSignedUrl()
+* we pass in the name of the operation we want to perform => upload a file or 'putObject'
+* we pass in params
+	* bucket (name of tthe bucket we are uploading to)
+	* key (name of the file we are uploading)
+	* ContentType ('ContentType' of the file that will be getting uploaded)
+* in our app the blog stored in mongoDB has: id,title,content and imageUrl. imageUrl might be sameamong different blogs eg img-001.jpg
+* this will create problem in teh bucket which is common for all posts as imageUrl is the key and must be unique
+* we dont want the user to provide the file name to avoid duplicates
+* buckets are flat file store. no folders inside
+* in in our key we use / bucket interpets the first part as a  folder
+* we would like to use to group images per user int he bucket (to insuakte users images and delete them when user deletes account
+
+### lecture 156 - Calling getSignedUrl()

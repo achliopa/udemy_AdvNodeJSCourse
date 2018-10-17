@@ -1969,9 +1969,94 @@ describe('user is not logged in, ', async () => {
 	});
 ```
 
-### Lecture 120 - Super Advanced Test Helpers
+### Lecture 120 - Super Advanced Test helpers
 
-* in this lecture a number of optional refactors to simplify test code
+* the refactor is to simplify the way we access info we dont have access to
+* in our test we might end up with many routes to test, where the user should not be able to view if he is not logged in
+* we need a way to write less code to test the routes
+* we would like a helper to make post requests
+* in tests/helpers/page.js we add anew function in our custom class
+* we add 2 methods get() and post() to call when we need to access a route. we need to pass in the path to the route as argument
+* the path is now in fetch() method in the test using the fetch library
+* we gut out all page.evaluate() from 'user cannot get a list of posts' test and move in the get(path){} helper
+* we mod the code. passing the path in the fetch() 
+* there is a PROBLEM. evaluate() takes all param as streing and passes it to cromium . so path is not evaluated to its val before passed to chromium
+* page.evaluate() puppeteer documnetation says about ...args so we can pass arguments in evaluate to get used in chroimum invoked code
+* this arg is passed as argument in the arrow method so we need to pas it as argument there as well. (not necessarily with same name, order matters)
+```
+	get(path) {
+		return this.page.evaluate((_path) => {
+			return fetch(_path, {
+				method: 'GET',
+				credentials: 'same-origin',
+				headers: {
+					'Content-Type': 'application/json'
+				}
+			}).then(res => res.json());
+		}, path);
+	}
+```
+* in our test we call it like `const result = await page.get('/api/blogs');`
+* we do the same for POST. we need 2 arguments. the path and the data to pass in
+* we gut out the evaluate() method from POST test in our new helper and modify it
+* we do the same trick but also with anoither additional param
+```
+	post(path, data) {
+		return this.page.evaluate((_path, _data)=> {
+			return fetch(_path, {
+				method: 'POST',
+				credentials: 'same-origin',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify(_data)
+			}).then(res => res.json());
+		}, path, data);
+	}
+```
+* we use it in our test `const result = await page.post('/api/blogs',{ title: 'My Title', content: 'My Content'});`
+* our second refactor is to add an object to include all possible route REST mehods arguments in one struct. method, route, data
+```
+	const actions = [
+		{
+			method: 'get',
+			path: '/api/blogs',
+		},
+		{
+			method: 'post',
+			path: '/api/blogs',
+			data: {
+				title: 'My Title',
+				content: 'My Content'
+			}
+		}
+	];
+```
+* the concept is to loop through this array use the params for testing and evaluate in a common result
+* we delete both tests and add a common one
+* we add the loop in page helpr as a method
+```
+	execRequests(actions) {
+		return Promise.all(actions.map(({method, path,data }) => {
+			return this.[method](path,data);
+		}));
+	}
+```
+* this is advanced stuff. we get the actions array we iterate through it with map and use obj destructuring to get its params in each element. 
+* when desctructuring in arrow arguments we need the parenthesis
+* we use [] string extrapolation to pass param as method name and invoke it
+* we have many async methods. we wrap them all with Promise.all() to wait till all of them finish
+* in the mtest we use
+```
+	test('Blog related actions are prohibited', async () => {
+		const results = await page.execRequests(actions);
+		for (let result of results) {
+			expect(result).toEqual({error: 'You must log in!'});
+		}
+	});
+```
+* we get all results in an array iterate throut it with let and assert result content
+* personally i dont like it. its not elegant. i liked first refactor more
 
 ## Section 6 - Wiring Up Continuous Integration
 
@@ -2337,4 +2422,184 @@ if (['production'].includes(process.env.NODE_ENV)) {
 
 ### Lecture 153 - Upload Routes Files
 
-* 
+* we will now install the aws sdk to assist us prepare the presigned url `npm install --save aws-sdk`
+* we should create a new route in our app that users can hit to get the presigned url
+* we add anew route file uploadRoutes.js
+* we export the routes in express app 
+```
+module.exports = app => {
+	
+};
+```
+* we import the file in index.js `require('./routes/uploadRoutes')(app);` immediately invoking it
+* we add a new route
+```
+	app.get('/api/upload', (req,res)=>{
+
+	});
+```
+
+### Lecture 154 - Configuring the AWS SDK
+
+* we ll iport the aws-sdk module initialize it with the keys and use it to get the URL
+* we import 
+```
+const AWS = require('aws-sdk');
+const keys = require('../config/keys');
+```
+* we initialize S3
+```
+const S3 = new AWS.S3({
+	accessKeyId: keys.accessKeyId,
+	secretAccessKey: keys.secretAccessKey
+});
+```
+
+### Lecture 155 - GetSignedURL arguments
+
+* we look at [docs](https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html) and look for getSignedUrl()
+* we pass in the name of the operation we want to perform => upload a file or 'putObject'
+* we pass in params
+	* bucket (name of tthe bucket we are uploading to)
+	* key (name of the file we are uploading)
+	* ContentType ('ContentType' of the file that will be getting uploaded)
+* in our app the blog stored in mongoDB has: id,title,content and imageUrl. imageUrl might be sameamong different blogs eg img-001.jpg
+* this will create problem in teh bucket which is common for all posts as imageUrl is the key and must be unique
+* we dont want the user to provide the file name to avoid duplicates
+* buckets are flat file store. no folders inside
+* in in our key we use / bucket interpets the first part as a  folder
+* we would like to use to group images per user int he bucket (to insuakte users images and delete them when user deletes account
+
+### Lecture 156 - Calling GetSignedURL
+
+* we ll code the upload route invoking se.getSignedUrl()
+* we pass the params.
+* for key we need sthing like *'myUserId/<unique fileid>.jpg'*
+* to create unique ids we use uuid module `npm install --save uuid`
+* we import the module in uploadRoutes.js `const uuid = require('uuid/v1');`
+* our key is `const key = `${req.user.id}/${uuid()}.jpeg`;`
+* we want to restrict access to the api to loged in users so we use the middleware
+* we import it `const requireLogin = require('../middlewares/requireLogin');` and use it in route
+* we add the callback
+```
+module.exports = app => {
+	app.get('/api/upload', requireLogin, (req,res)=>{
+		const key = `${req.user.id}/${uuid()}.jpeg`;
+		s3.getSignedUrl('putobject', {
+			Bucket: 'agileng-blog-bucket',
+			ContentType: 'jpeg',
+			Key: key
+		}, ()=>res.send({key, url}));
+	});
+};
+```
+
+### Lecture 157 - Viewing the Signed URL
+
+* we test our code in browser running our app.
+* we manually go to the route *localhost:5000/api/upload* and see the reply
+and hte url created by AWS
+
+### Lecture 158 - Attempting Image Upload
+
+* we go back to frontend and go to submitBlog() method in client/src/actions/index.js
+* this methods gets called with all values submitted in our form and navigation history
+* we have added one more param int eh reactcomponent call of the method, the file we want to upload
+* we use axios to call the backend api `const uploadConfig = await axios.get('/api/upload');`
+* we use a PUT req to aws using the url returned in the api call reply, we pass the file and a http header param needed by AWS
+```
+  await axios.put(uploadConfig.data.url, file, {
+    headers: {
+      'Content-Type': file.type
+    }
+  });
+```
+* we test it in app. we got an error. preflight is invalid (CORS request error)
+
+### Lecture 159 - Handling CORS errors
+
+* CORS request is when our app leves the host domain and tries to make a request in a completely different domain
+* AWS denies such requests for security
+* to understand why we see the flow:
+	* we want to use the presigned url from our legit app to upload to AWS S3
+	* say a malicious site host wants to store in our S3 without paying. the want to send their signed URL request to our bucket
+	* the malicious site will forward their requests to our app use the signedURl and forward it tou their user to store on our bucket. WE DONT WANT THAT
+* signedUrl has baked in CORS denial
+* we need to config our bucket in AWS
+* in Permissions => CORS configuration
+* there is only one rule that allows get requests to come from any IP. we can disable it to forbit viewing of our bucket content
+* we need a second rule for PUT requests restricting access
+```
+<CORSRule>
+	<AllowedOrigin>http://localhost:3000</AllowedOrigin>
+	<AllowedMethod>PUT</AllowedMethod>
+	<MaxAgeSeconds>3000</MaxAgeSeconds>
+	<AllowedHeader>*</AllowedHeader>
+</CORSRule>
+```
+* we save and retest. it passes!!!!!!!!!!!
+
+### Lecture 160 - Outstanding Issues
+
+* we go to S3 dashboard to see the uploaded image => overview
+* we have a folder with userid and inside we see the image
+* if we click on the image we se a access deny message
+* our bucket is locked down but we want users to access their images to appear on the blog
+
+### Lecture 161 - S3 Bucket Policies
+
+* we need to modify permission on the bucket. permissions=>bucket policy
+* we will allow anyone to see the contents of the bucket (Its a blog site...)
+* amazon will complain on security making our bucket public
+* we use the policy generator to make it
+	* type of policy: S3 bucket policy
+	* effect: allow
+	* principal: *
+	* aws service: amazon s3
+	* actions: getobject
+	* ARN: arn:aws:s3:::agileng-blog-bucket/*
+* click add statement and generate ploicy
+* aws complains on public access
+
+### Lecture 162 - Trying Uploads to Blogs
+
+* we need to link the image to the blog post in mongoDB (modify schema)
+* in submitblog api/upload call we get back the url and the key of the image as it is stored in the bucket. we can use it to retrieve it for rendering
+* we can pas the key in the values of the actual axios.post call to api/blogs so that we can use it further on
+* we use ES6 to expand values with upload cxonfig
+```
+  const res = await axios.post('/api/blogs', {
+    ...values, imageUrl: uploadConfig.data.url
+  });
+```
+* we add the imageUrl in the post api/blogs in blogroutes.js
+```
+ app.post('/api/blogs', requireLogin, cleanCache, async (req, res) => {
+    const { title, content,imageUrl } = req.body;
+
+    const blog = new Blog({
+      imageUrl,
+      title,
+      content,
+      _user: req.user.id
+    });
+.....
+```
+* we add url in Blog model `  imageUrl: String,`
+
+### Lecture 163 - Ensuring Images get Tied
+
+* we test our blog document in mlab to ensure image gets passed in mongo
+* storing onlythe file name is our choice as we might rename our bucket
+
+### Lecture 164 - Displaying Images
+
+* we go to client/src/components/blogs/BlogShow.js react component and add an imagerender method
+```
+  renderImage() {
+    if(this.props.blog.imageUrl) {
+      return <img src={`https://<bucketurl>${this.props.blog.imageUrl}`} />
+    }
+  }
+```
+* we invoke it in render() `        {this.renderImage()}`
